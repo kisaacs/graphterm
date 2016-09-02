@@ -41,6 +41,7 @@ can take a number of specs as input.
 from heapq import *
 import curses
 import curses.ascii
+import gv
 
 from llnl.util.lang import *
 from llnl.util.tty.color import *
@@ -460,6 +461,71 @@ class AsciiGraph(object):
 
                 elif self._frontier:
                     self._collapse_line(i)
+
+class TermDAG(object):
+
+    def __init__(self):
+        self._nodes = dict()
+        self._links = list()
+
+    def add_node(self, name):
+        node = TermNode(name)
+        self._nodes[name] = node
+
+    def add_link(self, source, sink):
+        link = TermLink(len(self._links), source, sink)
+        self._links.append(link)
+        self._nodes[source].add_out_link(link)
+        self._nodes[sink].add_in_link(link)
+
+    def to_dot_object(self):
+        dot = Digraph()
+
+        for node in self._nodes:
+            dot.node(node.name)
+
+        for link in self._links:
+            dot.edge(link.source, link.sink)
+
+        return dot
+
+class TermNode(object):
+
+    def __init__(self, node_id):
+        self.name = node_id
+        self._in_links = list()
+        self._out_links = list()
+
+    def add_in_link(self, link):
+        self._in_links.append(link)
+
+    def add_out_link(self, link):
+        self._out_links.append(link)
+
+class TermLink(object):
+
+    def __init__(self, link_id, source, sink):
+        self.id = link_id
+        self.source = source
+        self.sink = sink
+
+def spec_to_graph(self, spec):
+    """Convert Spack spec into a graph.
+
+    Arguments:
+    spec -- spec to graph.  This only handles one spec at a time.
+    """
+    # Work on a copy to be nondestructive
+    spec = spec.copy()
+    nodes = spec.index()
+    tg = TermDAG()
+    for name, node in nodes:
+        tg.add_node(name)
+
+    for name, node in nodes:
+        for dep in node.dependencies():
+            tg.add_link(name, dep.name)
+
 
 class InteractiveAsciiGraph(object):
 

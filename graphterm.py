@@ -40,6 +40,7 @@ can take a number of specs as input.
 
 from heapq import *
 import curses
+import curses.ascii
 
 from llnl.util.lang import *
 from llnl.util.tty.color import *
@@ -460,6 +461,267 @@ class AsciiGraph(object):
                 elif self._frontier:
                     self._collapse_line(i)
 
+class InteractiveAsciiGraph(object):
+
+    def __init__(self):
+        # These can be set after initialization or after a call to
+        # graph() to change behavior.
+        self.node_character = '*'
+        self.debug = False
+        self.indent = 0
+
+        # These are colors in the order they'll be used for edges.
+        # See llnl.util.tty.color for details on color characters.
+        self.colors = 'rgbmcyRGBMCY'
+
+        # Internal vars are used in the graph() function and are
+        # properly initialized there.
+        self._name_to_color = None    # Node name to color
+        self._state = None            # Screen state
+        self._row_lengths = None      # Array of row lengths
+        self._frontier = None         # frontier
+        self._nodes = None            # dict from name -> node
+        self._prev_state = None       # State of previous line
+        self._prev_index = None       # Index of expansion point of prev line
+        self._row = 0                 # Index of current row
+        self._col = 0
+        self._height = 0
+        self._width = 0
+
+    def set_screen_size(self, stdscr):
+        h, w = stdscr.getmaxyx()
+        self._height = h - 1
+        self._width = w - 1
+        self._state = [ [' ' for x in range(self._width) ] for y in range(self._height) ]
+        self._row_length = [ 0 for y in range(self._height) ]
+        self._row = 0
+        self._col = 0
+
+    def _indent(self):
+        for i in range(self.indent):
+            self._state[self._row][i] = ' '
+        self._row_length[self._row] = self.indent
+        self._col = self.indent
+
+    def _write_edge(self, string, index, sub=0):
+        """Write a colored edge to the output stream."""
+        name = self._frontier[index][sub]
+        #edge = "@%s{%s}" % (self._name_to_color[name], string)
+        for ch in string:
+            self._state[self._row][self._col] = ch
+            self._col += 1
+
+    def _connect_deps(self, i, deps, label=None):
+        """Connect dependencies to existing edges in the frontier.
+
+        ``deps`` are to be inserted at position i in the
+        frontier. This routine determines whether other open edges
+        should be merged with <deps> (if there are other open edges
+        pointing to the same place) or whether they should just be
+        inserted as a completely new open edge.
+
+        Open edges that are not fully expanded (i.e. those that point
+        at multiple places) are left intact.
+
+        Parameters:
+
+        label    -- optional debug label for the connection.
+
+        Returns: True if the deps were connected to another edge
+        (i.e. the frontier did not grow) and False if the deps were
+        NOT already in the frontier (i.e. they were inserted and the
+        frontier grew).
+
+        """
+        if len(deps) == 1 and deps in self._frontier:
+            j = self._frontier.index(deps)
+
+            # convert a right connection into a left connection
+            if i < j:
+                self._frontier.pop(j)
+                self._frontier.insert(i, deps)
+                return self._connect_deps(j, deps, label)
+
+            collapse = True
+            if self._prev_state == EXPAND_RIGHT:
+                # Special case where previous line expanded and i is off by 1.
+                self._back_edge_line([], j, i + 1, True,
+                                     label + "-1.5 " + str((i + 1, j)))
+                collapse = False
+
+            else:
+                # Previous node also expanded here, so i is off by one.
+                if self._prev_state == NODE and self._prev_index < i:
+                    i += 1
+
+                if i - j > 1:
+                    # We need two lines to connect if distance > 1
+                    self._back_edge_line([], j,  i, True,
+                                         label + "-1 " + str((i, j)))
+                    collapse = False
+
+            self._back_edge_line([j], -1, -1, collapse,
+                                 label + "-2 " + str((i, j)))
+            return True
+
+        elif deps:
+            self._frontier.insert(i, deps)
+            return False
+
+    def _set_state(self, state, index, label=None):
+        if state not in states:
+            raise ValueError("Invalid graph state!")
+        self._prev_state = state
+        self._prev_index = index
+
+        #if self.debug:
+        #    self._out.write(" " * 20)
+        #    self._out.write("%-20s" % (
+        #        str(self._prev_state) if self._prev_state else ''))
+        #    self._out.write("%-20s" % (str(label) if label else ''))
+        #    self._out.write("%s" % self._frontier)
+
+    def _back_edge_line(self, prev_ends, end, start, collapse, label=None):
+        """Write part of a backwards edge in the graph.
+
+        Writes single- or multi-line backward edges in an ascii graph.
+        For example, a single line edge::
+
+            | | | | o |
+            | | | |/ /  <-- single-line edge connects two nodes.
+            | | | o |
+
+        Or a multi-line edge (requires two calls to back_edge)::
+
+            | | | | o |
+            | |_|_|/ /   <-- multi-line edge crosses vertical edges.
+            |/| | | |
+            o | | | |
+
+        Also handles "pipelined" edges, where the same line contains
+        parts of multiple edges::
+
+                      o start
+            | |_|_|_|/|
+            |/| | |_|/| <-- this line has parts of 2 edges.
+            | | |/| | |
+            o   o
+
+        Arguments:
+
+        prev_ends -- indices in frontier of previous edges that need
+                     to be finished on this line.
+
+        end -- end of the current edge on this line.
+
+        start -- start index of the current edge.
+
+        collapse -- whether the graph will be collapsing (i.e. whether
+                    to slant the end of the line or keep it straight)
+
+        label -- optional debug label to print after the line.
+
+        """
+        def advance(to_pos, edges):
+            """Write edges up to <to_pos>."""
+            for i in range(self._pos, to_pos):
+                for e in edges():
+                    self._write_edge(*e)
+                self._pos += 1
+
+        flen = len(self._frontier)
+        self._pos = 0
+        self._indent()
+
+        for p in prev_ends:
+            advance(p,         lambda: [("| ", self._pos)])
+            advance(p + 1,     lambda: [("|/", self._pos)])
+
+        if end >= 0:
+            advance(end + 1,   lambda: [("| ", self._pos)])
+            advance(start - 1, lambda: [("|",  self._pos), ("_", end)])
+        else:
+            advance(start - 1, lambda: [("| ", self._pos)])
+
+        if start >= 0:
+            advance(start,     lambda: [("|",  self._pos), ("/", end)])
+
+        if collapse:
+            advance(flen,      lambda: [(" /", self._pos)])
+        else:
+            advance(flen,      lambda: [("| ", self._pos)])
+
+        self._set_state(BACK_EDGE, end, label)
+        #self._out.write("\n")
+        self._row += 1
+        self._col = 0
+
+    def _node_line(self, index, name):
+        """Writes a line with a node at index."""
+        self._indent()
+        for c in range(index):
+            self._write_edge("| ", c)
+
+        #self._out.write("%s " % self.node_character)
+        self._state[self._row][self._col] = self.node_character
+        self._col += 2
+
+        for c in range(index + 1, len(self._frontier)):
+            self._write_edge("| ", c)
+
+        #self._out.write(" %s" % name)
+        self._col += 1
+        for ch in name:
+            self._state[self._row][self._col] = ch
+            self._col += 1
+        self._set_state(NODE, index)
+        #self._out.write("\n")
+        self._row += 1
+        self._col = 0
+
+    def _collapse_line(self, index):
+        """Write a collapsing line after a node was added at index."""
+        self._indent()
+        for c in range(index):
+            self._write_edge("| ", c)
+        for c in range(index, len(self._frontier)):
+            self._write_edge(" /", c)
+
+        self._set_state(COLLAPSE, index)
+        #self._out.write("\n")
+        self._row += 1
+        self._col = 0
+
+    def _merge_right_line(self, index):
+        """Edge at index is same as edge to right.  Merge directly with '\'"""
+        self._indent()
+        for c in range(index):
+            self._write_edge("| ", c)
+        self._write_edge("|", index)
+        self._write_edge("\\", index + 1)
+        for c in range(index + 1, len(self._frontier)):
+            self._write_edge("| ", c)
+
+        self._set_state(MERGE_RIGHT, index)
+        #self._out.write("\n")
+        self._row += 1
+        self._col = 0
+
+    def _expand_right_line(self, index):
+        self._indent()
+        for c in range(index):
+            self._write_edge("| ", c)
+
+        self._write_edge("|", index)
+        self._write_edge("\\", index + 1)
+
+        for c in range(index + 2, len(self._frontier)):
+            self._write_edge(" \\", c)
+
+        self._set_state(EXPAND_RIGHT, index)
+        #self._out.write("\n")
+        self._row += 1
+        self._col = 0
 
     def write(self, spec, **kwargs):
         """Write out an ascii graph of the provided spec.
@@ -479,10 +741,10 @@ class AsciiGraph(object):
         if not out:
             out = sys.stdout
 
-        color = kwargs.get('color', None)
-        if not color:
-            color = out.isatty()
-        self._out = ColorStream(sys.stdout, color=color)
+        #color = kwargs.get('color', None)
+        #if not color:
+        #    color = out.isatty()
+        #self._out = ColorStream(sys.stdout, color=color)
 
         # We'll traverse the spec in topo order as we graph it.
         topo_order = topological_sort(spec, reverse=True)
@@ -493,8 +755,8 @@ class AsciiGraph(object):
 
         # Colors associated with each node in the DAG.
         # Edges are colored by the node they point to.
-        self._name_to_color = dict((name, self.colors[i % len(self.colors)])
-                                   for i, name in enumerate(topo_order))
+        #self._name_to_color = dict((name, self.colors[i % len(self.colors)])
+        #                           for i, name in enumerate(topo_order))
 
         # Frontier tracks open edges of the graph as it's written out.
         self._frontier = [[spec.name]]
@@ -583,6 +845,31 @@ class AsciiGraph(object):
                 elif self._frontier:
                     self._collapse_line(i)
 
+    def debug_state(self):
+        print "State info:"
+        for h in range(self._height):
+            string = ''
+            for w in range(self._width):
+                string += self._state[h][w]
+            print string
+        print self._width, self._height
+
+    def interactive(self, stdscr):
+        for h in range(self._height):
+            for w in range(self._width):
+                if self._state[h][w] != '':
+                    stdscr.addch(h, w, self._state[h][w])
+                else:
+                    continue
+
+        stdscr.refresh()
+
+        while True:
+            ch = stdscr.getch()
+            if ch == curses.KEY_MOUSE:
+                pass
+            elif ch == ord('q') or ch == ord('Q'):
+                return
 
 def graph_ascii(spec, **kwargs):
     node_character = kwargs.get('node', 'o')
@@ -601,6 +888,11 @@ def graph_ascii(spec, **kwargs):
 
 
 def graph_interactive(spec, **kwargs):
+    graph = InteractiveAsciiGraph()
+    curses.wrapper(interactive_helper, graph, spec, **kwargs)
+    #graph.debug_state()
+
+def interactive_helper(stdscr, graph, spec, **kwargs):
     node_character = kwargs.get('node', 'o')
     out            = kwargs.pop('out', None)
     debug          = kwargs.pop('debug', False)
@@ -608,14 +900,14 @@ def graph_interactive(spec, **kwargs):
     color          = kwargs.pop('color', None)
     check_kwargs(kwargs, graph_ascii)
 
-    graph = AsciiGraph()
+    graph.set_screen_size(stdscr)
     graph.debug = debug
     graph.indent = indent
     graph.node_character = node_character
 
-    graph.write_interactive(spec, color=color, out=out)
-
-
+    graph.write(spec, color=color, out=out)
+    #return
+    graph.interactive(stdscr)
 
 def graph_dot(*specs, **kwargs):
     """Generate a graph in dot format of all provided specs.

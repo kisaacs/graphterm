@@ -526,6 +526,8 @@ def spec_to_graph(self, spec):
         for dep in node.dependencies():
             tg.add_link(name, dep.name)
 
+    return tg
+
 
 class InteractiveAsciiGraph(object):
 

@@ -481,11 +481,11 @@ class TermDAG(object):
     def to_dot_object(self):
         dot = gv.digraph('term')
 
-        for node in self._nodes:
+        for node in self._nodes.values():
             gv.node(dot, node.name)
 
         for link in self._links:
-            gv.edge(link.sink, link.source)
+            gv.edge(dot, link.source, link.sink)
 
         return dot
 
@@ -510,20 +510,20 @@ class TermLink(object):
         self.sink = sink
 
 
-def spec_to_graph(self, spec):
+def spec_to_graph(spec):
     """Convert Spack spec into a graph.
 
     Arguments:
     spec -- spec to graph.  This only handles one spec at a time.
     """
     # Work on a copy to be nondestructive
-    spec = spec.copy()
-    nodes = spec.index()
+    myspec = spec.copy()
+    nodes = myspec.index()
     tg = TermDAG()
-    for name, node in nodes:
+    for name, node in nodes.items():
         tg.add_node(name)
 
-    for name, node in nodes:
+    for name, node in nodes.items():
         for dep in node.dependencies():
             tg.add_link(name, dep.name)
 
@@ -957,10 +957,10 @@ def graph_ascii(spec, **kwargs):
 
 
 def graph_interactive(spec, **kwargs):
-    tg = spect_to_graph(spec)
-    tg-dot = tg.to_dot_object()
-    gv.layout(tg-dot, 'dot')
-    gv.render(tg-dot, 'pdf', 'term-dag.pdf')
+    tg = spec_to_graph(spec)
+    dot = tg.to_dot_object()
+    gv.layout(dot, 'dot')
+    gv.render(dot, 'pdf', 'term-dag.pdf')
 
     graph = InteractiveAsciiGraph()
     curses.wrapper(interactive_helper, graph, spec, **kwargs)

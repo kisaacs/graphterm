@@ -489,6 +489,18 @@ class TermDAG(object):
 
         return dot
 
+    def write_dot_attributes(self, dot):
+        """Write the position values for each node."""
+
+        for node in self._nodes.values():
+            handle = gv.findnode(dot, node.name)
+            print '***', node.name, gv.getv(handle, 'rank'), gv.getv(handle, 'pos')
+
+            attr = gv.firstattr(handle)
+            while (attr):
+                print gv.nameof(attr)
+                attr = gv.nextattr(handle, attr)
+
 class TermNode(object):
 
     def __init__(self, node_id):
@@ -528,6 +540,8 @@ def spec_to_graph(spec):
             tg.add_link(name, dep.name)
 
     return tg
+
+
 
 
 class InteractiveAsciiGraph(object):
@@ -960,7 +974,9 @@ def graph_interactive(spec, **kwargs):
     tg = spec_to_graph(spec)
     dot = tg.to_dot_object()
     gv.layout(dot, 'dot')
+    tg.write_dot_attributes(dot)
     gv.render(dot, 'pdf', 'term-dag.pdf')
+
 
     graph = InteractiveAsciiGraph()
     curses.wrapper(interactive_helper, graph, spec, **kwargs)

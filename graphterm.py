@@ -467,6 +467,7 @@ class TermDAG(object):
     def __init__(self):
         self._nodes = dict()
         self._links = list()
+        self._positions_set = False
 
     def add_node(self, name):
         node = TermNode(name)
@@ -501,12 +502,37 @@ class TermDAG(object):
                 print gv.nameof(attr)
                 attr = gv.nextattr(handle, attr)
 
+    def get_dot_positions(self, dot):
+        """Get positions given by dot."""
+
+        plaintext = gv.renderdata(dot, 'plain')
+        print plaintext
+
+        xset = set()
+        yset = set()
+        for line in plaintext.split('\n'):
+            linevals = line.split(' ')
+            #print linevals
+            if linevals[0] == 'node':
+                node = self._nodes[linevals[1]]
+                node._x = linevals[2]
+                node._y = linevals[3]
+                xset.add(linevals[2])
+                yset.add(linevals[3])
+
+        self._positions_set = True
+
+        for node in self._nodes.values():
+            print node.name, node._x, node._y
+
 class TermNode(object):
 
     def __init__(self, node_id):
         self.name = node_id
         self._in_links = list()
         self._out_links = list()
+        self._x = -1
+        self._y = -1
 
     def add_in_link(self, link):
         self._in_links.append(link)
@@ -974,7 +1000,7 @@ def graph_interactive(spec, **kwargs):
     tg = spec_to_graph(spec)
     dot = tg.to_dot_object()
     gv.layout(dot, 'dot')
-    tg.write_dot_attributes(dot)
+    tg.get_dot_positions(dot)
     gv.render(dot, 'pdf', 'term-dag.pdf')
 
 

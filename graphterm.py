@@ -479,13 +479,13 @@ class TermDAG(object):
         self._nodes[sink].add_in_link(link)
 
     def to_dot_object(self):
-        dot = Digraph()
+        dot = gv.digraph('term')
 
         for node in self._nodes:
-            dot.node(node.name)
+            gv.node(dot, node.name)
 
         for link in self._links:
-            dot.edge(link.source, link.sink)
+            gv.edge(link.sink, link.source)
 
         return dot
 
@@ -508,6 +508,7 @@ class TermLink(object):
         self.id = link_id
         self.source = source
         self.sink = sink
+
 
 def spec_to_graph(self, spec):
     """Convert Spack spec into a graph.
@@ -956,6 +957,11 @@ def graph_ascii(spec, **kwargs):
 
 
 def graph_interactive(spec, **kwargs):
+    tg = spect_to_graph(spec)
+    tg-dot = tg.to_dot_object()
+    gv.layout(tg-dot, 'dot')
+    gv.render(tg-dot, 'pdf', 'term-dag.pdf')
+
     graph = InteractiveAsciiGraph()
     curses.wrapper(interactive_helper, graph, spec, **kwargs)
     #graph.debug_state()

@@ -1,0 +1,84 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "openssl"                      [label="openssl"]
+  "lcms"                         [label="lcms"]
+  "xorg-util-macros"             [label="xorg-util-macros"]
+  "glib"                         [label="glib"]
+  "libmng"                       [label="libmng"]
+  "xproto"                       [label="xproto"]
+  "gettext"                      [label="gettext"]
+  "libtiff"                      [label="libtiff"]
+  "pkg-config"                   [label="pkg-config"]
+  "python"                       [label="python"]
+  "libpthread-stubs"             [label="libpthread-stubs"]
+  "jpeg"                         [label="jpeg"]
+  "readline"                     [label="readline"]
+  "xcb-proto"                    [label="xcb-proto"]
+  "bzip2"                        [label="bzip2"]
+  "libxml2"                      [label="libxml2"]
+  "zlib"                         [label="zlib"]
+  "qt"                           [label="qt"]
+  "ncurses"                      [label="ncurses"]
+  "xz"                           [label="xz"]
+  "libxau"                       [label="libxau"]
+  "libffi"                       [label="libffi"]
+  "libxcb"                       [label="libxcb"]
+  "sqlite"                       [label="sqlite"]
+
+  "openssl" -> "zlib"
+  "lcms" -> "zlib"
+  "lcms" -> "libtiff"
+  "lcms" -> "jpeg"
+  "glib" -> "libffi"
+  "glib" -> "pcre"
+  "glib" -> "zlib"
+  "glib" -> "gettext"
+  "glib" -> "pkg-config"
+  "libmng" -> "zlib"
+  "libmng" -> "jpeg"
+  "libmng" -> "lcms"
+  "xproto" -> "xorg-util-macros"
+  "gettext" -> "bzip2"
+  "gettext" -> "tar"
+  "gettext" -> "libunistring"
+  "gettext" -> "ncurses"
+  "gettext" -> "libxml2"
+  "gettext" -> "xz"
+  "libtiff" -> "xz"
+  "libtiff" -> "zlib"
+  "libtiff" -> "jpeg"
+  "python" -> "bzip2"
+  "python" -> "ncurses"
+  "python" -> "zlib"
+  "python" -> "openssl"
+  "python" -> "sqlite"
+  "python" -> "tcl"
+  "python" -> "tk"
+  "python" -> "readline"
+  "readline" -> "ncurses"
+  "libxml2" -> "python"
+  "libxml2" -> "xz"
+  "libxml2" -> "zlib"
+  "qt" -> "glib"
+  "qt" -> "libtiff"
+  "qt" -> "libxml2"
+  "qt" -> "dbus"
+  "qt" -> "zlib"
+  "qt" -> "jpeg"
+  "qt" -> "gtkplus"
+  "qt" -> "libxcb"
+  "qt" -> "libpng"
+  "qt" -> "libmng"
+  "qt" -> "mesa"
+  "libxau" -> "xproto"
+  "libxau" -> "pkg-config"
+  "libxcb" -> "python"
+  "libxcb" -> "pkg-config"
+  "libxcb" -> "libpthread-stubs"
+  "libxcb" -> "libxau"
+  "libxcb" -> "xcb-proto"
+}

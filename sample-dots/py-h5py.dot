@@ -1,0 +1,56 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "python"                       [label="python"]
+  "py-setuptools"                [label="py-setuptools"]
+  "sqlite"                       [label="sqlite"]
+  "py-nose"                      [label="py-nose"]
+  "py-h5py"                      [label="py-h5py"]
+  "py-cython"                    [label="py-cython"]
+  "pkg-config"                   [label="pkg-config"]
+  "ncurses"                      [label="ncurses"]
+  "hdf5"                         [label="hdf5"]
+  "readline"                     [label="readline"]
+  "openssl"                      [label="openssl"]
+  "py-numpy"                     [label="py-numpy"]
+  "bzip2"                        [label="bzip2"]
+  "py-six"                       [label="py-six"]
+  "zlib"                         [label="zlib"]
+
+  "python" -> "bzip2"
+  "python" -> "ncurses"
+  "python" -> "zlib"
+  "python" -> "openssl"
+  "python" -> "sqlite"
+  "python" -> "tcl"
+  "python" -> "tk"
+  "python" -> "readline"
+  "py-setuptools" -> "python"
+  "py-nose" -> "python"
+  "py-nose" -> "py-setuptools"
+  "py-h5py" -> "py-six"
+  "py-h5py" -> "hdf5"
+  "py-h5py" -> "python"
+  "py-h5py" -> "mpi"
+  "py-h5py" -> "py-cython"
+  "py-h5py" -> "py-setuptools"
+  "py-h5py" -> "py-numpy"
+  "py-h5py" -> "py-mpi4py"
+  "py-h5py" -> "pkg-config"
+  "py-cython" -> "python"
+  "hdf5" -> "zlib"
+  "hdf5" -> "szip"
+  "hdf5" -> "mpi"
+  "readline" -> "ncurses"
+  "openssl" -> "zlib"
+  "py-numpy" -> "python"
+  "py-numpy" -> "lapack"
+  "py-numpy" -> "blas"
+  "py-numpy" -> "py-nose"
+  "py-numpy" -> "py-setuptools"
+  "py-six" -> "python"
+  "py-six" -> "py-setuptools"
+}

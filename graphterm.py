@@ -505,6 +505,7 @@ class TermDAG(object):
     def get_dot_positions(self, dot):
         """Get positions given by dot."""
 
+        gv.setv(dot, 'ranksep', '1.0 equally')
         plaintext = gv.renderdata(dot, 'plain')
         print plaintext
 
@@ -524,6 +525,22 @@ class TermDAG(object):
 
         for node in self._nodes.values():
             print node.name, node._x, node._y
+        print sorted(xset)
+        print sorted(yset)
+
+        x_to_col = dict()
+        for i, val in enumerate(sorted(xset)):
+            x_to_col[val] = i
+
+        y_to_row = dict()
+        num_ranks = len(yset)
+        for i, val in enumerate(sorted(yset)):
+            y_to_row[val] = num_ranks - i - 1
+
+        for node in self._nodes.values():
+            node._row = y_to_row[node._y]
+            node._col = x_to_col[node._x]
+            print node.name, node._row, node._col
 
 class TermNode(object):
 
@@ -533,6 +550,8 @@ class TermNode(object):
         self._out_links = list()
         self._x = -1
         self._y = -1
+        self._col = 0
+        self._row = 0
 
     def add_in_link(self, link):
         self._in_links.append(link)
@@ -995,6 +1014,9 @@ def graph_ascii(spec, **kwargs):
 
     graph.write(spec, color=color, out=out)
 
+def graph_nodecount(spec, **kwargs):
+    tg = spec_to_graph(spec)
+    print spec.name, len(tg._nodes.keys())
 
 def graph_interactive(spec, **kwargs):
     tg = spec_to_graph(spec)

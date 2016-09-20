@@ -1,0 +1,34 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "ncurses"                      [label="ncurses"]
+  "py-setuptools"                [label="py-setuptools"]
+  "py-decorator"                 [label="py-decorator"]
+  "py-networkx"                  [label="py-networkx"]
+  "openssl"                      [label="openssl"]
+  "python"                       [label="python"]
+  "sqlite"                       [label="sqlite"]
+  "readline"                     [label="readline"]
+  "bzip2"                        [label="bzip2"]
+  "zlib"                         [label="zlib"]
+
+  "py-setuptools" -> "python"
+  "py-decorator" -> "python"
+  "py-decorator" -> "py-setuptools"
+  "py-networkx" -> "python"
+  "py-networkx" -> "py-decorator"
+  "py-networkx" -> "py-setuptools"
+  "openssl" -> "zlib"
+  "python" -> "bzip2"
+  "python" -> "ncurses"
+  "python" -> "zlib"
+  "python" -> "openssl"
+  "python" -> "sqlite"
+  "python" -> "tcl"
+  "python" -> "tk"
+  "python" -> "readline"
+  "readline" -> "ncurses"
+}

@@ -1,0 +1,35 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "python"                       [label="python"]
+  "swig"                         [label="swig"]
+  "openssl"                      [label="openssl"]
+  "pkg-config"                   [label="pkg-config"]
+  "ncurses"                      [label="ncurses"]
+  "sqlite"                       [label="sqlite"]
+  "readline"                     [label="readline"]
+  "ghostscript"                  [label="ghostscript"]
+  "pcre"                         [label="pcre"]
+  "graphviz"                     [label="graphviz"]
+  "bzip2"                        [label="bzip2"]
+  "zlib"                         [label="zlib"]
+
+  "python" -> "bzip2"
+  "python" -> "ncurses"
+  "python" -> "zlib"
+  "python" -> "openssl"
+  "python" -> "sqlite"
+  "python" -> "tcl"
+  "python" -> "tk"
+  "python" -> "readline"
+  "swig" -> "pcre"
+  "openssl" -> "zlib"
+  "readline" -> "ncurses"
+  "graphviz" -> "python"
+  "graphviz" -> "swig"
+  "graphviz" -> "ghostscript"
+  "graphviz" -> "pkg-config"
+}

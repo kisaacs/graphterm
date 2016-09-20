@@ -1,0 +1,109 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "openssl"                      [label="openssl"]
+  "ncurses"                      [label="ncurses"]
+  "swig"                         [label="swig"]
+  "atk"                          [label="atk"]
+  "pkg-config"                   [label="pkg-config"]
+  "libpng"                       [label="libpng"]
+  "glib"                         [label="glib"]
+  "libxslt"                      [label="libxslt"]
+  "libgpg-error"                 [label="libgpg-error"]
+  "readline"                     [label="readline"]
+  "gettext"                      [label="gettext"]
+  "dia"                          [label="dia"]
+  "pcre"                         [label="pcre"]
+  "freetype"                     [label="freetype"]
+  "libtiff"                      [label="libtiff"]
+  "icu"                          [label="icu"]
+  "pixman"                       [label="pixman"]
+  "cairo"                        [label="cairo"]
+  "libxml2"                      [label="libxml2"]
+  "jpeg"                         [label="jpeg"]
+  "pango"                        [label="pango"]
+  "gdk-pixbuf"                   [label="gdk-pixbuf"]
+  "gtkplus"                      [label="gtkplus"]
+  "bzip2"                        [label="bzip2"]
+  "zlib"                         [label="zlib"]
+  "harfbuzz"                     [label="harfbuzz"]
+  "python"                       [label="python"]
+  "xz"                           [label="xz"]
+  "libffi"                       [label="libffi"]
+  "intltool"                     [label="intltool"]
+  "libgcrypt"                    [label="libgcrypt"]
+  "fontconfig"                   [label="fontconfig"]
+  "sqlite"                       [label="sqlite"]
+
+  "openssl" -> "zlib"
+  "swig" -> "pcre"
+  "atk" -> "glib"
+  "atk" -> "pkg-config"
+  "libpng" -> "zlib"
+  "glib" -> "libffi"
+  "glib" -> "pcre"
+  "glib" -> "zlib"
+  "glib" -> "gettext"
+  "glib" -> "pkg-config"
+  "libxslt" -> "xz"
+  "libxslt" -> "libxml2"
+  "libxslt" -> "zlib"
+  "libxslt" -> "libgcrypt"
+  "readline" -> "ncurses"
+  "gettext" -> "bzip2"
+  "gettext" -> "tar"
+  "gettext" -> "libunistring"
+  "gettext" -> "ncurses"
+  "gettext" -> "libxml2"
+  "gettext" -> "xz"
+  "dia" -> "intltool"
+  "dia" -> "python"
+  "dia" -> "cairo"
+  "dia" -> "swig"
+  "dia" -> "gtkplus"
+  "dia" -> "libpng"
+  "dia" -> "libxslt"
+  "freetype" -> "libpng"
+  "libtiff" -> "xz"
+  "libtiff" -> "zlib"
+  "libtiff" -> "jpeg"
+  "pixman" -> "libpng"
+  "pixman" -> "pkg-config"
+  "cairo" -> "glib"
+  "cairo" -> "freetype"
+  "cairo" -> "fontconfig"
+  "cairo" -> "libpng"
+  "cairo" -> "pixman"
+  "cairo" -> "pkg-config"
+  "libxml2" -> "python"
+  "libxml2" -> "xz"
+  "libxml2" -> "zlib"
+  "pango" -> "cairo"
+  "pango" -> "harfbuzz"
+  "gdk-pixbuf" -> "glib"
+  "gdk-pixbuf" -> "libpng"
+  "gdk-pixbuf" -> "libtiff"
+  "gdk-pixbuf" -> "jpeg"
+  "gtkplus" -> "gdk-pixbuf"
+  "gtkplus" -> "pango"
+  "gtkplus" -> "atk"
+  "harfbuzz" -> "glib"
+  "harfbuzz" -> "cairo"
+  "harfbuzz" -> "freetype"
+  "harfbuzz" -> "zlib"
+  "harfbuzz" -> "icu"
+  "python" -> "bzip2"
+  "python" -> "ncurses"
+  "python" -> "zlib"
+  "python" -> "openssl"
+  "python" -> "sqlite"
+  "python" -> "tcl"
+  "python" -> "tk"
+  "python" -> "readline"
+  "libgcrypt" -> "libgpg-error"
+  "fontconfig" -> "libxml2"
+  "fontconfig" -> "freetype"
+}

@@ -1,0 +1,15 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "jpeg"                         [label="jpeg"]
+  "xz"                           [label="xz"]
+  "zlib"                         [label="zlib"]
+  "libtiff"                      [label="libtiff"]
+
+  "libtiff" -> "xz"
+  "libtiff" -> "zlib"
+  "libtiff" -> "jpeg"
+}

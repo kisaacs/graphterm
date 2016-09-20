@@ -1,0 +1,147 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "r-plyr"                       [label="r-plyr"]
+  "jdk"                          [label="jdk"]
+  "openssl"                      [label="openssl"]
+  "pkg-config"                   [label="pkg-config"]
+  "libpng"                       [label="libpng"]
+  "curl"                         [label="curl"]
+  "glib"                         [label="glib"]
+  "r-dichromat"                  [label="r-dichromat"]
+  "r-scales"                     [label="r-scales"]
+  "r-gtable"                     [label="r-gtable"]
+  "r-munsell"                    [label="r-munsell"]
+  "r-rcpp"                       [label="r-rcpp"]
+  "r-ggplot2"                    [label="r-ggplot2"]
+  "gettext"                      [label="gettext"]
+  "r-labeling"                   [label="r-labeling"]
+  "r-rcolorbrewer"               [label="r-rcolorbrewer"]
+  "pcre"                         [label="pcre"]
+  "freetype"                     [label="freetype"]
+  "libtiff"                      [label="libtiff"]
+  "icu"                          [label="icu"]
+  "pixman"                       [label="pixman"]
+  "tcl"                          [label="tcl"]
+  "cairo"                        [label="cairo"]
+  "libxml2"                      [label="libxml2"]
+  "jpeg"                         [label="jpeg"]
+  "pango"                        [label="pango"]
+  "r-mass"                       [label="r-mass"]
+  "r-magrittr"                   [label="r-magrittr"]
+  "bzip2"                        [label="bzip2"]
+  "zlib"                         [label="zlib"]
+  "harfbuzz"                     [label="harfbuzz"]
+  "ncurses"                      [label="ncurses"]
+  "r-stringr"                    [label="r-stringr"]
+  "R"                            [label="R"]
+  "xz"                           [label="xz"]
+  "r-colorspace"                 [label="r-colorspace"]
+  "r-digest"                     [label="r-digest"]
+  "tk"                           [label="tk"]
+  "libffi"                       [label="libffi"]
+  "readline"                     [label="readline"]
+  "fontconfig"                   [label="fontconfig"]
+  "r-stringi"                    [label="r-stringi"]
+  "r-reshape2"                   [label="r-reshape2"]
+
+  "r-plyr" -> "R"
+  "r-plyr" -> "r-rcpp"
+  "openssl" -> "zlib"
+  "libpng" -> "zlib"
+  "curl" -> "zlib"
+  "curl" -> "openssl"
+  "glib" -> "libffi"
+  "glib" -> "pcre"
+  "glib" -> "zlib"
+  "glib" -> "gettext"
+  "glib" -> "pkg-config"
+  "r-dichromat" -> "R"
+  "r-scales" -> "r-rcolorbrewer"
+  "r-scales" -> "r-labeling"
+  "r-scales" -> "r-plyr"
+  "r-scales" -> "r-munsell"
+  "r-scales" -> "R"
+  "r-scales" -> "r-dichromat"
+  "r-scales" -> "r-rcpp"
+  "r-gtable" -> "R"
+  "r-munsell" -> "r-colorspace"
+  "r-munsell" -> "R"
+  "r-rcpp" -> "R"
+  "r-ggplot2" -> "r-reshape2"
+  "r-ggplot2" -> "r-plyr"
+  "r-ggplot2" -> "r-gtable"
+  "r-ggplot2" -> "r-mass"
+  "r-ggplot2" -> "R"
+  "r-ggplot2" -> "r-digest"
+  "r-ggplot2" -> "r-scales"
+  "gettext" -> "bzip2"
+  "gettext" -> "tar"
+  "gettext" -> "libunistring"
+  "gettext" -> "ncurses"
+  "gettext" -> "libxml2"
+  "gettext" -> "xz"
+  "r-labeling" -> "R"
+  "r-rcolorbrewer" -> "R"
+  "freetype" -> "libpng"
+  "libtiff" -> "xz"
+  "libtiff" -> "zlib"
+  "libtiff" -> "jpeg"
+  "pixman" -> "libpng"
+  "pixman" -> "pkg-config"
+  "tcl" -> "zlib"
+  "cairo" -> "glib"
+  "cairo" -> "freetype"
+  "cairo" -> "fontconfig"
+  "cairo" -> "libpng"
+  "cairo" -> "pixman"
+  "cairo" -> "pkg-config"
+  "libxml2" -> "python"
+  "libxml2" -> "xz"
+  "libxml2" -> "zlib"
+  "pango" -> "cairo"
+  "pango" -> "harfbuzz"
+  "r-mass" -> "R"
+  "r-magrittr" -> "R"
+  "harfbuzz" -> "glib"
+  "harfbuzz" -> "cairo"
+  "harfbuzz" -> "freetype"
+  "harfbuzz" -> "zlib"
+  "harfbuzz" -> "icu"
+  "r-stringr" -> "R"
+  "r-stringr" -> "r-stringi"
+  "r-stringr" -> "r-magrittr"
+  "R" -> "glib"
+  "R" -> "pcre"
+  "R" -> "bzip2"
+  "R" -> "libtiff"
+  "R" -> "jdk"
+  "R" -> "lapack"
+  "R" -> "cairo"
+  "R" -> "blas"
+  "R" -> "zlib"
+  "R" -> "freetype"
+  "R" -> "jpeg"
+  "R" -> "ncurses"
+  "R" -> "tcl"
+  "R" -> "tk"
+  "R" -> "readline"
+  "R" -> "curl"
+  "R" -> "pango"
+  "R" -> "icu"
+  "r-colorspace" -> "R"
+  "r-digest" -> "R"
+  "tk" -> "tcl"
+  "readline" -> "ncurses"
+  "fontconfig" -> "libxml2"
+  "fontconfig" -> "freetype"
+  "r-stringi" -> "R"
+  "r-stringi" -> "icu"
+  "r-reshape2" -> "r-plyr"
+  "r-reshape2" -> "R"
+  "r-reshape2" -> "r-rcpp"
+  "r-reshape2" -> "r-stringr"
+}

@@ -1,0 +1,164 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "atk"                          [label="atk"]
+  "swig"                         [label="swig"]
+  "openssl"                      [label="openssl"]
+  "libdwarf"                     [label="libdwarf"]
+  "boost"                        [label="boost"]
+  "libpng"                       [label="libpng"]
+  "py-pygobject"                 [label="py-pygobject"]
+  "libelf"                       [label="libelf"]
+  "py-pygtk"                     [label="py-pygtk"]
+  "glib"                         [label="glib"]
+  "graphviz"                     [label="graphviz"]
+  "gettext"                      [label="gettext"]
+  "mrnet"                        [label="mrnet"]
+  "libgpg-error"                 [label="libgpg-error"]
+  "ghostscript"                  [label="ghostscript"]
+  "pcre"                         [label="pcre"]
+  "stat"                         [label="stat"]
+  "py-py2cairo"                  [label="py-py2cairo"]
+  "libtiff"                      [label="libtiff"]
+  "icu"                          [label="icu"]
+  "launchmon"                    [label="launchmon"]
+  "pkg-config"                   [label="pkg-config"]
+  "gobject-introspection"        [label="gobject-introspection"]
+  "pixman"                       [label="pixman"]
+  "ncurses"                      [label="ncurses"]
+  "cairo"                        [label="cairo"]
+  "jpeg"                         [label="jpeg"]
+  "readline"                     [label="readline"]
+  "m4"                           [label="m4"]
+  "gtkplus"                      [label="gtkplus"]
+  "bzip2"                        [label="bzip2"]
+  "libxml2"                      [label="libxml2"]
+  "zlib"                         [label="zlib"]
+  "harfbuzz"                     [label="harfbuzz"]
+  "python"                       [label="python"]
+  "fontconfig"                   [label="fontconfig"]
+  "libtool"                      [label="libtool"]
+  "pango"                        [label="pango"]
+  "freetype"                     [label="freetype"]
+  "xz"                           [label="xz"]
+  "autoconf"                     [label="autoconf"]
+  "libffi"                       [label="libffi"]
+  "libgcrypt"                    [label="libgcrypt"]
+  "automake"                     [label="automake"]
+  "sqlite"                       [label="sqlite"]
+  "gdk-pixbuf"                   [label="gdk-pixbuf"]
+
+  "atk" -> "glib"
+  "atk" -> "pkg-config"
+  "swig" -> "pcre"
+  "openssl" -> "zlib"
+  "libdwarf" -> "libelf"
+  "boost" -> "python"
+  "boost" -> "bzip2"
+  "boost" -> "zlib"
+  "boost" -> "icu"
+  "boost" -> "mpi"
+  "libpng" -> "zlib"
+  "py-pygobject" -> "python"
+  "py-pygobject" -> "libffi"
+  "py-pygobject" -> "py-py2cairo"
+  "py-pygobject" -> "glib"
+  "py-pygobject" -> "gobject-introspection"
+  "elf" -> "libelf"
+  "py-pygtk" -> "glib"
+  "py-pygtk" -> "py-pygobject"
+  "py-pygtk" -> "python"
+  "py-pygtk" -> "cairo"
+  "py-pygtk" -> "py-py2cairo"
+  "py-pygtk" -> "gtkplus"
+  "py-pygtk" -> "libffi"
+  "glib" -> "libffi"
+  "glib" -> "pcre"
+  "glib" -> "zlib"
+  "glib" -> "gettext"
+  "glib" -> "pkg-config"
+  "graphviz" -> "python"
+  "graphviz" -> "swig"
+  "graphviz" -> "ghostscript"
+  "graphviz" -> "pkg-config"
+  "gettext" -> "bzip2"
+  "gettext" -> "tar"
+  "gettext" -> "libunistring"
+  "gettext" -> "ncurses"
+  "gettext" -> "libxml2"
+  "gettext" -> "xz"
+  "mrnet" -> "boost"
+  "stat" -> "swig"
+  "stat" -> "launchmon"
+  "stat" -> "dyninst"
+  "stat" -> "automake"
+  "stat" -> "python"
+  "stat" -> "mrnet"
+  "stat" -> "libtool"
+  "stat" -> "mpi"
+  "stat" -> "libelf"
+  "stat" -> "graphviz"
+  "stat" -> "graphlib"
+  "stat" -> "autoconf"
+  "stat" -> "py-pygtk"
+  "stat" -> "libdwarf"
+  "py-py2cairo" -> "python"
+  "py-py2cairo" -> "cairo"
+  "py-py2cairo" -> "pixman"
+  "libtiff" -> "xz"
+  "libtiff" -> "zlib"
+  "libtiff" -> "jpeg"
+  "launchmon" -> "autoconf"
+  "launchmon" -> "libtool"
+  "launchmon" -> "libgcrypt"
+  "launchmon" -> "libgpg-error"
+  "launchmon" -> "automake"
+  "gobject-introspection" -> "glib"
+  "gobject-introspection" -> "python"
+  "gobject-introspection" -> "cairo"
+  "pixman" -> "libpng"
+  "pixman" -> "pkg-config"
+  "cairo" -> "glib"
+  "cairo" -> "freetype"
+  "cairo" -> "fontconfig"
+  "cairo" -> "libpng"
+  "cairo" -> "pixman"
+  "cairo" -> "pkg-config"
+  "readline" -> "ncurses"
+  "m4" -> "libsigsegv"
+  "gtkplus" -> "gdk-pixbuf"
+  "gtkplus" -> "pango"
+  "gtkplus" -> "atk"
+  "libxml2" -> "python"
+  "libxml2" -> "xz"
+  "libxml2" -> "zlib"
+  "harfbuzz" -> "glib"
+  "harfbuzz" -> "cairo"
+  "harfbuzz" -> "freetype"
+  "harfbuzz" -> "zlib"
+  "harfbuzz" -> "icu"
+  "python" -> "bzip2"
+  "python" -> "ncurses"
+  "python" -> "zlib"
+  "python" -> "openssl"
+  "python" -> "sqlite"
+  "python" -> "tcl"
+  "python" -> "tk"
+  "python" -> "readline"
+  "fontconfig" -> "libxml2"
+  "fontconfig" -> "freetype"
+  "libtool" -> "m4"
+  "pango" -> "cairo"
+  "pango" -> "harfbuzz"
+  "freetype" -> "libpng"
+  "autoconf" -> "m4"
+  "libgcrypt" -> "libgpg-error"
+  "automake" -> "autoconf"
+  "gdk-pixbuf" -> "glib"
+  "gdk-pixbuf" -> "libpng"
+  "gdk-pixbuf" -> "libtiff"
+  "gdk-pixbuf" -> "jpeg"
+}

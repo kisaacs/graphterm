@@ -1,0 +1,98 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "jdk"                          [label="jdk"]
+  "openssl"                      [label="openssl"]
+  "pkg-config"                   [label="pkg-config"]
+  "libpng"                       [label="libpng"]
+  "curl"                         [label="curl"]
+  "glib"                         [label="glib"]
+  "gettext"                      [label="gettext"]
+  "pcre"                         [label="pcre"]
+  "freetype"                     [label="freetype"]
+  "libtiff"                      [label="libtiff"]
+  "icu"                          [label="icu"]
+  "pixman"                       [label="pixman"]
+  "tcl"                          [label="tcl"]
+  "cairo"                        [label="cairo"]
+  "r-curl"                       [label="r-curl"]
+  "jpeg"                         [label="jpeg"]
+  "pango"                        [label="pango"]
+  "bzip2"                        [label="bzip2"]
+  "libxml2"                      [label="libxml2"]
+  "zlib"                         [label="zlib"]
+  "harfbuzz"                     [label="harfbuzz"]
+  "ncurses"                      [label="ncurses"]
+  "R"                            [label="R"]
+  "xz"                           [label="xz"]
+  "tk"                           [label="tk"]
+  "libffi"                       [label="libffi"]
+  "readline"                     [label="readline"]
+  "fontconfig"                   [label="fontconfig"]
+
+  "openssl" -> "zlib"
+  "libpng" -> "zlib"
+  "curl" -> "zlib"
+  "curl" -> "openssl"
+  "glib" -> "libffi"
+  "glib" -> "pcre"
+  "glib" -> "zlib"
+  "glib" -> "gettext"
+  "glib" -> "pkg-config"
+  "gettext" -> "bzip2"
+  "gettext" -> "tar"
+  "gettext" -> "libunistring"
+  "gettext" -> "ncurses"
+  "gettext" -> "libxml2"
+  "gettext" -> "xz"
+  "freetype" -> "libpng"
+  "libtiff" -> "xz"
+  "libtiff" -> "zlib"
+  "libtiff" -> "jpeg"
+  "pixman" -> "libpng"
+  "pixman" -> "pkg-config"
+  "tcl" -> "zlib"
+  "cairo" -> "glib"
+  "cairo" -> "freetype"
+  "cairo" -> "fontconfig"
+  "cairo" -> "libpng"
+  "cairo" -> "pixman"
+  "cairo" -> "pkg-config"
+  "r-curl" -> "curl"
+  "r-curl" -> "R"
+  "pango" -> "cairo"
+  "pango" -> "harfbuzz"
+  "libxml2" -> "python"
+  "libxml2" -> "xz"
+  "libxml2" -> "zlib"
+  "harfbuzz" -> "glib"
+  "harfbuzz" -> "cairo"
+  "harfbuzz" -> "freetype"
+  "harfbuzz" -> "zlib"
+  "harfbuzz" -> "icu"
+  "R" -> "glib"
+  "R" -> "pcre"
+  "R" -> "bzip2"
+  "R" -> "libtiff"
+  "R" -> "jdk"
+  "R" -> "lapack"
+  "R" -> "cairo"
+  "R" -> "blas"
+  "R" -> "zlib"
+  "R" -> "freetype"
+  "R" -> "jpeg"
+  "R" -> "ncurses"
+  "R" -> "tcl"
+  "R" -> "tk"
+  "R" -> "readline"
+  "R" -> "curl"
+  "R" -> "pango"
+  "R" -> "icu"
+  "tk" -> "tcl"
+  "readline" -> "ncurses"
+  "fontconfig" -> "libxml2"
+  "fontconfig" -> "freetype"
+}

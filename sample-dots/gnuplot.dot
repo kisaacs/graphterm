@@ -1,0 +1,76 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "icu"                          [label="icu"]
+  "harfbuzz"                     [label="harfbuzz"]
+  "ncurses"                      [label="ncurses"]
+  "pixman"                       [label="pixman"]
+  "gnuplot"                      [label="gnuplot"]
+  "libffi"                       [label="libffi"]
+  "xz"                           [label="xz"]
+  "pkg-config"                   [label="pkg-config"]
+  "libcerf"                      [label="libcerf"]
+  "cairo"                        [label="cairo"]
+  "libxml2"                      [label="libxml2"]
+  "gettext"                      [label="gettext"]
+  "libpng"                       [label="libpng"]
+  "pango"                        [label="pango"]
+  "cmake"                        [label="cmake"]
+  "readline"                     [label="readline"]
+  "glib"                         [label="glib"]
+  "fontconfig"                   [label="fontconfig"]
+  "freetype"                     [label="freetype"]
+  "libgd"                        [label="libgd"]
+  "zlib"                         [label="zlib"]
+
+  "harfbuzz" -> "glib"
+  "harfbuzz" -> "cairo"
+  "harfbuzz" -> "freetype"
+  "harfbuzz" -> "zlib"
+  "harfbuzz" -> "icu"
+  "pixman" -> "libpng"
+  "pixman" -> "pkg-config"
+  "gnuplot" -> "cairo"
+  "gnuplot" -> "libcerf"
+  "gnuplot" -> "libgd"
+  "gnuplot" -> "readline"
+  "gnuplot" -> "pango"
+  "gnuplot" -> "wx"
+  "cairo" -> "glib"
+  "cairo" -> "freetype"
+  "cairo" -> "fontconfig"
+  "cairo" -> "libpng"
+  "cairo" -> "pixman"
+  "cairo" -> "pkg-config"
+  "libxml2" -> "python"
+  "libxml2" -> "xz"
+  "libxml2" -> "zlib"
+  "gettext" -> "bzip2"
+  "gettext" -> "tar"
+  "gettext" -> "libunistring"
+  "gettext" -> "ncurses"
+  "gettext" -> "libxml2"
+  "gettext" -> "xz"
+  "libpng" -> "zlib"
+  "pango" -> "cairo"
+  "pango" -> "harfbuzz"
+  "cmake" -> "ncurses"
+  "cmake" -> "python"
+  "cmake" -> "py-sphinx"
+  "cmake" -> "openssl"
+  "cmake" -> "qt"
+  "readline" -> "ncurses"
+  "glib" -> "libffi"
+  "glib" -> "pcre"
+  "glib" -> "zlib"
+  "glib" -> "gettext"
+  "glib" -> "pkg-config"
+  "fontconfig" -> "libxml2"
+  "fontconfig" -> "freetype"
+  "freetype" -> "libpng"
+  "libgd" -> "libpng"
+  "libgd" -> "cmake"
+}

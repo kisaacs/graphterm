@@ -1,0 +1,70 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "glm"                          [label="glm"]
+  "lapack"                       [label="lapack"]
+  "trilinos"                     [label="trilinos"]
+  "netcdf"                       [label="netcdf"]
+  "moab"                         [label="moab"]
+  "blas"                         [label="blas"]
+  "matio"                        [label="matio"]
+  "hdf5"                         [label="hdf5"]
+  "curl"                         [label="curl"]
+  "m4"                           [label="m4"]
+  "cmake"                        [label="cmake"]
+  "openssl"                      [label="openssl"]
+  "parmetis"                     [label="parmetis"]
+  "metis"                        [label="metis"]
+  "mpi"                          [label="mpi"]
+  "zlib"                         [label="zlib"]
+
+  "glm" -> "cmake"
+  "trilinos" -> "swig"
+  "trilinos" -> "superlu-dist"
+  "trilinos" -> "cmake"
+  "trilinos" -> "glm"
+  "trilinos" -> "hypre"
+  "trilinos" -> "lapack"
+  "trilinos" -> "scalapack"
+  "trilinos" -> "blas"
+  "trilinos" -> "metis"
+  "trilinos" -> "mpi"
+  "trilinos" -> "suite-sparse"
+  "trilinos" -> "py-numpy"
+  "trilinos" -> "netcdf"
+  "trilinos" -> "mumps"
+  "trilinos" -> "python"
+  "trilinos" -> "matio"
+  "trilinos" -> "boost"
+  "trilinos" -> "parmetis"
+  "trilinos" -> "hdf5"
+  "netcdf" -> "m4"
+  "netcdf" -> "curl"
+  "netcdf" -> "zlib"
+  "netcdf" -> "hdf5"
+  "netcdf" -> "hdf"
+  "moab" -> "trilinos"
+  "moab" -> "hdf5"
+  "moab" -> "netcdf"
+  "moab" -> "parmetis"
+  "moab" -> "mpi"
+  "hdf5" -> "zlib"
+  "hdf5" -> "szip"
+  "hdf5" -> "mpi"
+  "curl" -> "zlib"
+  "curl" -> "openssl"
+  "m4" -> "libsigsegv"
+  "cmake" -> "ncurses"
+  "cmake" -> "python"
+  "cmake" -> "py-sphinx"
+  "cmake" -> "openssl"
+  "cmake" -> "qt"
+  "openssl" -> "zlib"
+  "parmetis" -> "metis"
+  "parmetis" -> "cmake"
+  "parmetis" -> "mpi"
+  "metis" -> "cmake"
+}

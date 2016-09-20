@@ -1,0 +1,143 @@
+digraph G {
+  label = "Spack Dependencies"
+  labelloc = "b"
+  rankdir = "LR"
+  ranksep = "5"
+
+  "binutils"                     [label="binutils"]
+  "dyninst"                      [label="dyninst"]
+  "openssl"                      [label="openssl"]
+  "pkg-config"                   [label="pkg-config"]
+  "boost"                        [label="boost"]
+  "libpng"                       [label="libpng"]
+  "xorg-util-macros"             [label="xorg-util-macros"]
+  "libelf"                       [label="libelf"]
+  "glib"                         [label="glib"]
+  "libmng"                       [label="libmng"]
+  "xproto"                       [label="xproto"]
+  "openspeedshop"                [label="openspeedshop"]
+  "flex"                         [label="flex"]
+  "gettext"                      [label="gettext"]
+  "libtiff"                      [label="libtiff"]
+  "lcms"                         [label="lcms"]
+  "libdwarf"                     [label="libdwarf"]
+  "bison"                        [label="bison"]
+  "python"                       [label="python"]
+  "libpthread-stubs"             [label="libpthread-stubs"]
+  "jpeg"                         [label="jpeg"]
+  "readline"                     [label="readline"]
+  "m4"                           [label="m4"]
+  "xcb-proto"                    [label="xcb-proto"]
+  "bzip2"                        [label="bzip2"]
+  "libxml2"                      [label="libxml2"]
+  "zlib"                         [label="zlib"]
+  "qt"                           [label="qt"]
+  "ncurses"                      [label="ncurses"]
+  "xz"                           [label="xz"]
+  "libxau"                       [label="libxau"]
+  "libffi"                       [label="libffi"]
+  "cmake"                        [label="cmake"]
+  "libxcb"                       [label="libxcb"]
+  "sqlite"                       [label="sqlite"]
+
+  "binutils" -> "m4"
+  "binutils" -> "bison"
+  "binutils" -> "flex"
+  "dyninst" -> "cmake"
+  "dyninst" -> "boost"
+  "dyninst" -> "libelf"
+  "dyninst" -> "libdwarf"
+  "openssl" -> "zlib"
+  "boost" -> "python"
+  "boost" -> "bzip2"
+  "boost" -> "zlib"
+  "boost" -> "icu"
+  "boost" -> "mpi"
+  "libpng" -> "zlib"
+  "elf" -> "libelf"
+  "glib" -> "libffi"
+  "glib" -> "pcre"
+  "glib" -> "zlib"
+  "glib" -> "gettext"
+  "glib" -> "pkg-config"
+  "libmng" -> "zlib"
+  "libmng" -> "jpeg"
+  "libmng" -> "lcms"
+  "xproto" -> "xorg-util-macros"
+  "openspeedshop" -> "mvapich2"
+  "openspeedshop" -> "sqlite"
+  "openspeedshop" -> "mrnet"
+  "openspeedshop" -> "cbtf"
+  "openspeedshop" -> "libmonitor"
+  "openspeedshop" -> "cmake"
+  "openspeedshop" -> "openmpi"
+  "openspeedshop" -> "mpich"
+  "openspeedshop" -> "bison"
+  "openspeedshop" -> "boost"
+  "openspeedshop" -> "flex"
+  "openspeedshop" -> "mpich2"
+  "openspeedshop" -> "papi"
+  "openspeedshop" -> "python"
+  "openspeedshop" -> "dyninst"
+  "openspeedshop" -> "mpt"
+  "openspeedshop" -> "libunwind"
+  "openspeedshop" -> "mvapich"
+  "openspeedshop" -> "qt"
+  "openspeedshop" -> "cbtf-argonavis"
+  "openspeedshop" -> "cbtf-krell"
+  "openspeedshop" -> "libelf"
+  "openspeedshop" -> "binutils"
+  "openspeedshop" -> "libdwarf"
+  "flex" -> "m4"
+  "flex" -> "bison"
+  "gettext" -> "bzip2"
+  "gettext" -> "tar"
+  "gettext" -> "libunistring"
+  "gettext" -> "ncurses"
+  "gettext" -> "libxml2"
+  "gettext" -> "xz"
+  "libtiff" -> "xz"
+  "libtiff" -> "zlib"
+  "libtiff" -> "jpeg"
+  "lcms" -> "zlib"
+  "lcms" -> "libtiff"
+  "lcms" -> "jpeg"
+  "libdwarf" -> "libelf"
+  "bison" -> "m4"
+  "python" -> "bzip2"
+  "python" -> "ncurses"
+  "python" -> "zlib"
+  "python" -> "openssl"
+  "python" -> "sqlite"
+  "python" -> "tcl"
+  "python" -> "tk"
+  "python" -> "readline"
+  "readline" -> "ncurses"
+  "m4" -> "libsigsegv"
+  "libxml2" -> "python"
+  "libxml2" -> "xz"
+  "libxml2" -> "zlib"
+  "qt" -> "glib"
+  "qt" -> "libtiff"
+  "qt" -> "libxml2"
+  "qt" -> "dbus"
+  "qt" -> "zlib"
+  "qt" -> "jpeg"
+  "qt" -> "gtkplus"
+  "qt" -> "libxcb"
+  "qt" -> "libpng"
+  "qt" -> "libmng"
+  "qt" -> "mesa"
+  "libxau" -> "xproto"
+  "libxau" -> "pkg-config"
+  "cmake" -> "ncurses"
+  "cmake" -> "python"
+  "cmake" -> "py-sphinx"
+  "cmake" -> "openssl"
+  "cmake" -> "qt"
+  "libxcb" -> "python"
+  "libxcb" -> "pkg-config"
+  "libxcb" -> "libpthread-stubs"
+  "libxcb" -> "libxau"
+  "libxcb" -> "xcb-proto"
+}

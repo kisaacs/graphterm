@@ -42,6 +42,7 @@ from heapq import *
 import curses
 import curses.ascii
 import gv
+from tulip import *
 
 from llnl.util.lang import *
 from llnl.util.tty.color import *

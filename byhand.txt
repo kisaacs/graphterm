@@ -1,0 +1,113 @@
+  o
+ /|\
+o_| |
+|\|\|
+| | |
+o o o
+
+  o
+ /|\
+| o |
+|/|\|
+o o o
+
+ lcms
+  o
+ /|\
+| |_o libtiff
+|/|/|
+| | |
+| | o jpeg
+| o zlib
+o xz
+
+      o python
+  ____|____
+ / / / \ \ \
+o o o   | o |  bzip2, sqlite openssl, readline
+     \  |  \|  
+      \ |   o ncurses
+        o zlib
+
+
+      o python
+  ____|____
+ / / / \ \ \
+| o o   o o |  openssl, bzip2, sqlite, readline
+|/         \|  
+o zlib      o ncurses
+
+
+   o cram
+  _|_  
+ / | \ 
+o  o  o python  (cmake, mpi)
+  ____|____
+ / / / \ \ \
+| o o   o o |  openssl, bzip2, sqlite, readline
+|/         \|  
+o zlib      o ncurses
+
+
+        o py-networkx
+       /|\
+      | | o py-decorator
+      | |/
+      | o py-setuptools
+      |/
+      o python
+  ____|____
+ / / / \ \ \
+| o o   o o |  openssl, bzip2, sqlite, readline
+|/         \|  
+o zlib      o ncurses
+
+
+          o graphviz
+        __|__
+       / / \ \ 
+      | o   o o swig (ghostscript, pkg-config) 
+      |       |
+      |       o pcre
+      o python
+  ____|____
+ / / / \ \ \
+| o o   o o |  openssl, bzip2, sqlite, readline
+|/         \|  
+o zlib      o ncurses
+
+
+                  o py-h5py
+          ________|_________________
+         /   /    | \        \      \
+  numpy o   o six |  o cython o hdf5 o pkg-config
+        |\  |     |  |        |
+   nose	| o |     |  |        |
+	| |\|     |  |        |
+  setup	| | o     |  |        |
+         \_\_\___ | /        /
+		 \|/        /
+		  o python /
+	      ____|____   /
+	     / / / \ \ \ /  
+	    | o o   o o |  readline, bzip2, sqlite, openssl
+	    |/         \|  
+	    o ncurses   o zlib
+
+
+          o mesa
+           ___|________
+          /   |        \
+ libxml2 o    o llvm    o libdrm
+	/|\   |\        |
+    xz o | \_ | o cmake o libpciaccess
+        /    \|         |
+        |     o python  o libtool
+	|     |         |
+	| ____|____     o m4
+	|/ / / \ \ \    
+	| o o   o o |  openssl, bzip2, sqlite, readline
+	|/         \|  
+	o zlib      o ncurses
+
+

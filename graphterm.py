@@ -469,16 +469,77 @@ class TermDAG(object):
         self._nodes = dict()
         self._links = list()
         self._positions_set = False
+        self._tulip = tlp.newGraph()
 
     def add_node(self, name):
-        node = TermNode(name)
+        tulipNode = self._tulip.addNode()
+        node = TermNode(name, tulipNode)
         self._nodes[name] = node
 
     def add_link(self, source, sink):
-        link = TermLink(len(self._links), source, sink)
+        tulipLink = self._tulip.addEdge(
+            self._nodes[source].tulipNode,
+            self._nodes[sink].tulipNode
+        )
+        link = TermLink(len(self._links), source, sink, tulipLink)
         self._links.append(link)
         self._nodes[source].add_out_link(link)
         self._nodes[sink].add_in_link(link)
+
+    def layout_hierarchical(self):
+        viewLabel = self._tulip.getStringProperty('viewLabel')
+        for node in self._nodes.values():
+            viewLabel[node.tulipNode] = node.name
+
+        params = tlp.getDefaultPluginParameters('Hierarchical Graph', self._tulip)
+        params['orientation'] = 'vertical'
+        params['layer spacing'] = 5
+        params['node spacing'] = 5
+        viewLayout = self._tulip.getLayoutProperty('viewLayout')
+
+        self._tulip.applyLayoutAlgorithm('Hierarchical Graph', viewLayout, params)
+
+        xset = set()
+        yset = set()
+        segments = set()
+        for node in self._nodes.values():
+            coord = viewLayout.getNodeValue(node.tulipNode)
+            node._x = coord[0]
+            node._y = coord[1]
+            xset.add(coord[0])
+            yset.add(coord[1])
+
+        for link in self._links:
+            link._coords = viewLayout.getEdgeValue(link.tulipLink)
+            last = (self._nodes[link.source]._x, self._nodes[link.source]._y)
+            last_node = True
+            for coord in link._coords:
+                xset.add(coord[0])
+                yset.add(coord[1])
+                segment = TermSegment(last[0], last[1], coord[0],
+                    coord[1], last_node, False)
+                segments.add(segment)
+                last = (coord[0], coord[1])
+                last_node = False
+            segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
+                self._nodes[link.sink]._y, last_node, True)
+            segments.add(segment)
+
+
+        self.write_tulip_positions();
+        print "xset", sorted(list(xset))
+        print "yset", sorted(list(yset))
+        tlp.saveGraph(self._tulip, 'test.tlp')
+        for segment in segments:
+            print segment
+
+    def write_tulip_positions(self):
+        for node in self._nodes.values():
+            print node.name, node._x, node._y
+
+        for link in self._links:
+            print link.source, link.sink, link._coords
+
 
     def to_dot_object(self):
         dot = gv.digraph('term')
@@ -543,9 +604,33 @@ class TermDAG(object):
             node._col = x_to_col[node._x]
             print node.name, node._row, node._col
 
+class TermSegment(object):
+
+    def __init__(self, x1, y1, x2, y2, e1 = False, e2 = False):
+        self.x1 = x1
+        self.x2 = x2
+        self.y1 = y1
+        self.y2 = y2
+        self.e1 = e1
+        self.e2 = e2
+
+    def __eq__(self, other):
+        return (self.x1 == other.x1
+            and self.x2 == other.x2
+            and self.y1 == other.y1
+            and self.y2 == other.y2
+            and self.e1 == other.e1
+            and self.e2 == other.e2)
+
+    def __repr__(self):
+        return "TermSegment(%s, %s, %s, %s, %s, %s)" % (self.x1, self.y1, self.x2, self.y2, self.e1, self.e2)
+
+    def __hash__(self):
+        return hash(self.__repr__())
+
 class TermNode(object):
 
-    def __init__(self, node_id):
+    def __init__(self, node_id, tulip):
         self.name = node_id
         self._in_links = list()
         self._out_links = list()
@@ -553,6 +638,7 @@ class TermNode(object):
         self._y = -1
         self._col = 0
         self._row = 0
+        self.tulipNode = tulip
 
     def add_in_link(self, link):
         self._in_links.append(link)
@@ -562,10 +648,12 @@ class TermNode(object):
 
 class TermLink(object):
 
-    def __init__(self, link_id, source, sink):
+    def __init__(self, link_id, source, sink, tlp):
         self.id = link_id
         self.source = source
         self.sink = sink
+        self.tulipLink = tlp
+        self._coords = None
 
 
 def spec_to_graph(spec):
@@ -1021,10 +1109,11 @@ def graph_nodecount(spec, **kwargs):
 
 def graph_interactive(spec, **kwargs):
     tg = spec_to_graph(spec)
-    dot = tg.to_dot_object()
-    gv.layout(dot, 'dot')
-    tg.get_dot_positions(dot)
-    gv.render(dot, 'pdf', 'term-dag.pdf')
+    tg.layout_hierarchical()
+    #dot = tg.to_dot_object()
+    #gv.layout(dot, 'dot')
+    #tg.get_dot_positions(dot)
+    #gv.render(dot, 'pdf', 'term-dag.pdf')
 
 
     graph = InteractiveAsciiGraph()

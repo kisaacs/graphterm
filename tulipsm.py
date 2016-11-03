@@ -5,9 +5,9 @@ graph = tlp.newGraph()
 
 a = graph.addNode()
 b = graph.addNode()
-c = graph.addNode()
+#c = graph.addNode()
 eab = graph.addEdge(a,b)
-eac = graph.addEdge(a,c)
+#eac = graph.addEdge(a,c)
 
 params = tlp.getDefaultPluginParameters('Hierarchical Graph', graph)
 params['orientation'] = 'vertical'

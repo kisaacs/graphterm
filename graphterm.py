@@ -502,12 +502,15 @@ class TermDAG(object):
         xset = set()
         yset = set()
         segments = set()
+        coord_to_node = dict()
+        coord_to_placer = dict()
         for node in self._nodes.values():
             coord = viewLayout.getNodeValue(node.tulipNode)
             node._x = coord[0]
             node._y = coord[1]
             xset.add(coord[0])
             yset.add(coord[1])
+            coord_to_node[(coord[0], coord[1])] = node
 
         for link in self._links:
             link._coords = viewLayout.getEdgeValue(link.tulipLink)
@@ -519,19 +522,51 @@ class TermDAG(object):
                 segment = TermSegment(last[0], last[1], coord[0],
                     coord[1], last_node, False)
                 segments.add(segment)
+
+                if (coord[0], coord[1]) in coord_to_node:
+                    placer = coord_to_node[(coord[0], coord[1])]
+                    placer._in_segments.append(segment)
+                else:
+                    placer = TermNode("", None, False)
+                    coord_to_node[(coord[0], coord[1])] = placer
+                    coord_to_placer[(coord[0], coord[1])] = placer
+                    placer._in_segments.append(segment)
+                    placer._x = coord[0]
+                    placer._y = coord[1]
+
+                coord_to_node[last]._out_segments.append(segment)
                 last = (coord[0], coord[1])
                 last_node = False
+
             segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
                 self._nodes[link.sink]._y, last_node, True)
+            placer = coord_to_node[last]
+            placer._out_segments.append(segment)
+            self._nodes[link.sink]._in_segments.append(segment)
             segments.add(segment)
 
-
+        xsort = sorted(list(xset))
+        ysort = sorted(list(yset))
+        ysort.reverse()
         self.write_tulip_positions();
-        print "xset", sorted(list(xset))
-        print "yset", sorted(list(yset))
+        print "xset", xsort
+        print "yset", ysort
         tlp.saveGraph(self._tulip, 'test.tlp')
-        for segment in segments:
-            print segment
+        #for segment in segments:
+        #    print segment
+
+        row_lookup = dict()
+        col_lookup = dict()
+        for i, x in enumerate(xsort):
+            col_lookup[x] = i
+        for i, y in enumerate(ysort):
+            row_lookup[y] = i
+        print row_lookup, col_lookup
+
+        for coord, node in coord_to_node.items():
+            node._row = row_lookup[coord[1]]
+            node._col = col_lookup[coord[0]]
+
 
     def write_tulip_positions(self):
         for node in self._nodes.values():
@@ -630,7 +665,7 @@ class TermSegment(object):
 
 class TermNode(object):
 
-    def __init__(self, node_id, tulip):
+    def __init__(self, node_id, tulip, real = True):
         self.name = node_id
         self._in_links = list()
         self._out_links = list()
@@ -639,6 +674,10 @@ class TermNode(object):
         self._col = 0
         self._row = 0
         self.tulipNode = tulip
+
+        self.real = real
+        self._in_segments = list()
+        self._out_segments = list()
 
     def add_in_link(self, link):
         self._in_links.append(link)

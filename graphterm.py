@@ -470,6 +470,9 @@ class TermDAG(object):
         self._links = list()
         self._positions_set = False
         self._tulip = tlp.newGraph()
+        self.gridsize = [0,0]
+        self.gridedge = [] # the last char per row
+        self.grid = []
 
     def add_node(self, name):
         tulipNode = self._tulip.addNode()
@@ -522,10 +525,12 @@ class TermDAG(object):
                 segment = TermSegment(last[0], last[1], coord[0],
                     coord[1], last_node, False)
                 segments.add(segment)
+                segment.start = coord_to_node[last]
 
                 if (coord[0], coord[1]) in coord_to_node:
                     placer = coord_to_node[(coord[0], coord[1])]
                     placer._in_segments.append(segment)
+                    segment.end = placer
                 else:
                     placer = TermNode("", None, False)
                     coord_to_node[(coord[0], coord[1])] = placer
@@ -533,6 +538,8 @@ class TermDAG(object):
                     placer._in_segments.append(segment)
                     placer._x = coord[0]
                     placer._y = coord[1]
+                    segment.end = placer
+
 
                 coord_to_node[last]._out_segments.append(segment)
                 last = (coord[0], coord[1])
@@ -543,17 +550,26 @@ class TermDAG(object):
             placer = coord_to_node[last]
             placer._out_segments.append(segment)
             self._nodes[link.sink]._in_segments.append(segment)
+            segment.start = placer
+            segment.end = self._nodes[link.sink]
             segments.add(segment)
 
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
         ysort.reverse()
+        self.gridsize = [len(xsort) * 2, len(ysort) * 2]
         self.write_tulip_positions();
         print "xset", xsort
         print "yset", ysort
+        print self.gridsize
         tlp.saveGraph(self._tulip, 'test.tlp')
         #for segment in segments:
         #    print segment
+
+        for i in range(self.gridsize[0]):
+            self.grid.append(['' for j in range(self.gridsize[1])])
+            self.gridedge.append(0)
+        print self.grid
 
         row_lookup = dict()
         col_lookup = dict()
@@ -649,6 +665,9 @@ class TermSegment(object):
         self.e1 = e1
         self.e2 = e2
 
+        self.start = None
+        self.stop = None
+
     def __eq__(self, other):
         return (self.x1 == other.x1
             and self.x2 == other.x2
@@ -678,6 +697,7 @@ class TermNode(object):
         self.real = real
         self._in_segments = list()
         self._out_segments = list()
+
 
     def add_in_link(self, link):
         self._in_links.append(link)

@@ -557,7 +557,7 @@ class TermDAG(object):
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
         ysort.reverse()
-        self.gridsize = [len(xsort) * 2, len(ysort) * 2]
+        self.gridsize = [len(ysort) * 2, len(xsort) * 2]
         self.write_tulip_positions();
         print "xset", xsort
         print "yset", ysort
@@ -567,9 +567,8 @@ class TermDAG(object):
         #    print segment
 
         for i in range(self.gridsize[0]):
-            self.grid.append(['' for j in range(self.gridsize[1])])
+            self.grid.append([' ' for j in range(self.gridsize[1])])
             self.gridedge.append(0)
-        print self.grid
 
         row_lookup = dict()
         col_lookup = dict()
@@ -577,11 +576,21 @@ class TermDAG(object):
             col_lookup[x] = i
         for i, y in enumerate(ysort):
             row_lookup[y] = i
-        print row_lookup, col_lookup
 
         for coord, node in coord_to_node.items():
             node._row = row_lookup[coord[1]]
             node._col = col_lookup[coord[0]]
+            if node.real:
+                self.grid[node._row * 2][node._col * 2] = 'o'
+            else:
+                self.grid[node._row * 2][node._col * 2] = '.'
+
+
+        self.print_grid()
+
+    def print_grid(self):
+        for row in self.grid:
+            print ''.join(row)
 
 
     def write_tulip_positions(self):

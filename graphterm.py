@@ -578,15 +578,75 @@ class TermDAG(object):
             row_lookup[y] = i
 
         for coord, node in coord_to_node.items():
-            node._row = row_lookup[coord[1]]
-            node._col = col_lookup[coord[0]]
+            node._row = 2 * row_lookup[coord[1]]
+            node._col = 2 * col_lookup[coord[0]]
             if node.real:
-                self.grid[node._row * 2][node._col * 2] = 'o'
+                self.grid[node._row][node._col] = 'o'
             else:
-                self.grid[node._row * 2][node._col * 2] = '.'
+                self.grid[node._row][node._col] = '.'
 
+        for segment in segments:
+            segment.gridlist =  bersenham(segment)
 
         self.print_grid()
+
+    def bresenham(self, segment):
+        x1 = segment.start._col
+        y1 = segment.start._row
+        x2 = segment.end._col
+        y2 = segment.end._row
+
+        # We know we are always moving vaguely down, so we only have
+        # four of the Bresenham cases:
+        # abs(delta x) > delta y AND delta x > 0
+        # abs(delta x) > delta y AND delta x < 0
+        # abs(delta x) < delta y AND delta x > 0
+        # abs(delta x) < delta y AND delta x < 0
+        deltax = x2 - x1
+        deltay = y2 - y1
+        start = to_octant(deltax, deltay, x1, y1)
+        stop = to_octant(deltax, deltay, x2, y2)
+        return bresenham_octant(start[0], start[1], stop[0], stop[1], deltax, deltay)
+
+    def bresenham_octant(self, x1, y1, x2, y2, deltax, deltay):
+        dx = x2 - x1
+        dy = y2 - y1
+        D = 2 * dy - dx
+        y = y1
+
+        moves = []
+        for x in range(x1, x2 + 1):
+            moves.append(from_octant(deltax, deltay, x,y))
+            if D >= 0:
+                y += 1
+                D -= dx
+            D += dy
+        return moves
+
+    def to_octant(self, dx, dy, x, y):
+        if abs(dx) > dy:
+            if dx > 0:
+                return (x,y)
+            else:
+                return (-x, y)
+        else:
+            if dx > 0:
+                return (y, -x)
+            else:
+                return (-y, x)
+
+    def from_octant(self, dx, dy, x, y):
+        if abs(dx) > dy:
+            if dx > 0:
+                return (x,y)
+            else:
+                return (-x, y)
+        else:
+            if dx > 0:
+                return (y, x)
+            else:
+                return (-y, x)
+
 
     def print_grid(self):
         for row in self.grid:
@@ -675,7 +735,8 @@ class TermSegment(object):
         self.e2 = e2
 
         self.start = None
-        self.stop = None
+        self.end = None
+        self.gridlist = []
 
     def __eq__(self, other):
         return (self.x1 == other.x1

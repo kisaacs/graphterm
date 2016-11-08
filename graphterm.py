@@ -614,6 +614,8 @@ class TermDAG(object):
             elif char != self.grid[y][x]:
                 print 'ERROR at', x, y, ' : ', char, 'vs', self.grid[y][x]
                 self.grid[y][x] = 'X'
+            last_x = x
+            last_y = y
 
     # We need to see where we were to see where we go next.
     # If both x & y change: use a slash, back if pos, forward if neg
@@ -646,7 +648,6 @@ class TermDAG(object):
         segment.octant = self.get_octant(x2 - x1, y2 - y1)
         start = self.to_octant(segment.octant, x1, y1)
         stop = self.to_octant(segment.octant, x2, y2)
-        print start, stop, 'is start/stop'
         return self.bresenham_octant(start[0], start[1], stop[0], stop[1], segment.octant)
 
     def get_octant(self, dx, dy):
@@ -672,9 +673,7 @@ class TermDAG(object):
             range_dir = -1
 
         moves = []
-        print 'range is:', x1, x2, range_dir
         for x in range(x1, x2, range_dir):
-            print 'in loop', x, y
             moves.append(self.from_octant(octant, x,y))
             if D >= 0:
                 y += 1

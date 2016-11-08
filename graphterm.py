@@ -474,6 +474,11 @@ class TermDAG(object):
         self.gridedge = [] # the last char per row
         self.grid = []
 
+        self.RIGHT = 0
+        self.DOWN_RIGHT = 1
+        self.DOWN_LEFT = 2
+        self.LEFT = 3
+
     def add_node(self, name):
         tulipNode = self._tulip.addNode()
         node = TermNode(name, tulipNode)
@@ -586,9 +591,45 @@ class TermDAG(object):
                 self.grid[node._row][node._col] = '.'
 
         for segment in segments:
-            segment.gridlist =  bersenham(segment)
+            print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
+            segment.gridlist =  self.bresenham(segment)
+            print segment.gridlist
+            self.set_to_grid(segment)
+            self.print_grid()
 
         self.print_grid()
+
+    def set_to_grid(self, segment):
+        start = segment.start
+        end = segment.end
+        last_x = start._col
+        last_y = start._row
+        for coord in segment.gridlist:
+            x, y = coord
+            char = self.link_char(last_x, last_y, x, y)
+            if char == '':
+                continue
+            if self.grid[y][x] == ' ':
+                self.grid[y][x] = char
+            elif char != self.grid[y][x]:
+                print 'ERROR at', x, y, ' : ', char, 'vs', self.grid[y][x]
+                self.grid[y][x] = 'X'
+
+    # We need to see where we were to see where we go next.
+    # If both x & y change: use a slash, back if pos, forward if neg
+    # If only x changes: use an underscore
+    # If only y changes: use a pipe
+    def link_char(self, x1, y1, x2, y2):
+        if x1 == x2 and y1 == y2:
+            return ''
+        elif x1 == x2:
+            return '|'
+        elif y1 == y2:
+            return '_'
+        elif x1 < x2:
+            return '\\'
+        else:
+            return '/'
 
     def bresenham(self, segment):
         x1 = segment.start._col
@@ -602,51 +643,68 @@ class TermDAG(object):
         # abs(delta x) > delta y AND delta x < 0
         # abs(delta x) < delta y AND delta x > 0
         # abs(delta x) < delta y AND delta x < 0
-        deltax = x2 - x1
-        deltay = y2 - y1
-        start = to_octant(deltax, deltay, x1, y1)
-        stop = to_octant(deltax, deltay, x2, y2)
-        return bresenham_octant(start[0], start[1], stop[0], stop[1], deltax, deltay)
+        segment.octant = self.get_octant(x2 - x1, y2 - y1)
+        start = self.to_octant(segment.octant, x1, y1)
+        stop = self.to_octant(segment.octant, x2, y2)
+        print start, stop, 'is start/stop'
+        return self.bresenham_octant(start[0], start[1], stop[0], stop[1], segment.octant)
 
-    def bresenham_octant(self, x1, y1, x2, y2, deltax, deltay):
+    def get_octant(self, dx, dy):
+        if abs(dx) > dy:
+            if dx > 0:
+                return self.RIGHT
+            else:
+                return self.LEFT
+        else:
+            if dx > 0:
+                return self.DOWN_RIGHT
+            else:
+                return self.DOWN_LEFT
+
+    def bresenham_octant(self, x1, y1, x2, y2, octant):
         dx = x2 - x1
         dy = y2 - y1
         D = 2 * dy - dx
         y = y1
+        if x2 > x1:
+            range_dir = 1
+        else:
+            range_dir = -1
 
         moves = []
-        for x in range(x1, x2 + 1):
-            moves.append(from_octant(deltax, deltay, x,y))
+        print 'range is:', x1, x2, range_dir
+        for x in range(x1, x2, range_dir):
+            print 'in loop', x, y
+            moves.append(self.from_octant(octant, x,y))
             if D >= 0:
                 y += 1
                 D -= dx
             D += dy
         return moves
 
-    def to_octant(self, dx, dy, x, y):
-        if abs(dx) > dy:
-            if dx > 0:
-                return (x,y)
-            else:
-                return (-x, y)
-        else:
-            if dx > 0:
-                return (y, -x)
-            else:
-                return (-y, x)
+    def to_octant(self, octant, x, y):
+        if octant == self.RIGHT:
+            return (x,y)
+        elif octant == self.LEFT:
+            return (-x, y)
+        elif octant == self.DOWN_RIGHT:
+            return (y, x)
+        elif octant == self.DOWN_LEFT:
+            return (y, -x)
 
-    def from_octant(self, dx, dy, x, y):
-        if abs(dx) > dy:
-            if dx > 0:
-                return (x,y)
-            else:
-                return (-x, y)
-        else:
-            if dx > 0:
-                return (y, x)
-            else:
-                return (-y, x)
+        print 'ERROR NO OCTANT'
 
+    def from_octant(self, octant, x, y):
+        if octant == self.RIGHT:
+            return (x,y)
+        elif octant == self.LEFT:
+            return (-x, y)
+        elif octant == self.DOWN_RIGHT:
+            return (y, x)
+        elif octant == self.DOWN_LEFT:
+            return (-y, x)
+
+        print 'ERROR NO OCTANT'
 
     def print_grid(self):
         for row in self.grid:
@@ -736,6 +794,7 @@ class TermSegment(object):
 
         self.start = None
         self.end = None
+        self.octant = -1
         self.gridlist = []
 
     def __eq__(self, other):

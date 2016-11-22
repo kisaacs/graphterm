@@ -781,6 +781,62 @@ class TermDAG(object):
             node._col = x_to_col[node._x]
             print node.name, node._row, node._col
 
+    def find_crossings(self, segments):
+        self.pqueue = []
+        for segment in segments:
+            heapq.heappush(self.pqueue, (segment.x1, segment.y1, segment))
+            heapq.heappush(self.pqueue, (segment.x2, segment.y2, segment))
+
+
+class TermBST(object):
+
+    def __init__(self):
+        self.root = None
+
+    def insert(self, segment):
+        self.root = self.insert_helper(self.root, segment)
+
+    def insert_helper(self, root, segment):
+        if root is None:
+            root = TermBSTNode(segment)
+        elif root.segment > segment:
+            root.left = self.insert_helper(root.left, segment)
+        else:
+            root.right = self.insert_helper(root.right, segment)
+        return root
+
+    def delete(self, node):
+        self.root = self.delete_helper(self.root, node)
+
+    def delete_helper(self, root, node):
+        if root == node:
+            if node.left is None and node.right is None:
+                return None
+            elif node.left is None:
+                return node.right
+            elif node.right is None:
+                return node.left
+            else:
+                predecessor = node.left
+                while predecessor:
+                    predecessor = predecessor.right
+                segment = predecessor.segment
+                self.delete(predecessor)
+                node.segment = segment
+                return node
+        else:
+            if root.segment > node.segment:
+                root.left = self.delete_helper(root.left, node)
+            else:
+                root.right = self.delete_helper(root.right, node)
+
+class TermBSTNode(object):
+
+    def __init__(self, segment):
+        self.segment = segment
+        self.left = None
+        self.right = None
+
 class TermSegment(object):
 
     def __init__(self, x1, y1, x2, y2, e1 = False, e2 = False):
@@ -803,6 +859,15 @@ class TermSegment(object):
             and self.y2 == other.y2
             and self.e1 == other.e1
             and self.e2 == other.e2)
+
+    # For the line-sweep algorithm
+    def __lt__(self, other):
+        if self.x1 < self.x2:
+            return True
+        elif self.y1 < self.y2:
+            return True
+
+        return False
 
     def __repr__(self):
         return "TermSegment(%s, %s, %s, %s, %s, %s)" % (self.x1, self.y1, self.x2, self.y2, self.e1, self.e2)

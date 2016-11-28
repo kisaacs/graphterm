@@ -38,7 +38,7 @@ can take a number of specs as input.
 
 """
 
-from heapq import *
+import heapq
 import curses
 import curses.ascii
 import gv
@@ -571,6 +571,10 @@ class TermDAG(object):
         #for segment in segments:
         #    print segment
 
+        self.find_crossings(segments)
+        for k, v in self.crossings.items():
+            print k, v
+
         for i in range(self.gridsize[0]):
             self.grid.append([' ' for j in range(self.gridsize[1])])
             self.gridedge.append(0)
@@ -595,7 +599,7 @@ class TermDAG(object):
             segment.gridlist =  self.bresenham(segment)
             print segment.gridlist
             self.set_to_grid(segment)
-            self.print_grid()
+            #self.print_grid()
 
         self.print_grid()
 
@@ -782,11 +786,83 @@ class TermDAG(object):
             print node.name, node._row, node._col
 
     def find_crossings(self, segments):
-        self.pqueue = []
-        for segment in segments:
-            heapq.heappush(self.pqueue, (segment.x1, segment.y1, segment))
-            heapq.heappush(self.pqueue, (segment.x2, segment.y2, segment))
+        self.bst = TermBST() # BST of segments crossing L
+        self.pqueue = [] # Priority Queue of potential future events
+        endpoints = set() # True endpoints -- we don't count crossings here
+        self.crossings = dict() # Will be (segment1, segment2) = (x, y)
 
+        # Put all segments in queue
+        for segment in segments:
+            heapq.heappush(self.pqueue, (segment.x1, segment.y1, segment, segment))
+            heapq.heappush(self.pqueue, (segment.x2, segment.y2, segment, segment))
+            endpoints.union((segment.x1,segment.y1))
+            endpoints.union((segment.x2,segment.y2))
+
+        while self.pqueue:
+            x1, y1, segment1, segment2 = heapq.heappop(self.pqueue)
+            if segment.is_left_endpoint(x1, y1):
+                self.left_endpoint(segment1)
+            elif segment.is_right_endpoint(x1, y1):
+                self.right_endpoint(segment2)
+            else:
+                self.crossing(x1, y1, segment1, segment2)
+
+    def left_endpoint(self, segment):
+        self.bst.insert(segment)
+        before = self.bst.find_previous(segment)
+        after = self.bst.find_next(segment)
+        if (before, after) in self.crossings:
+            x, y = self.crossings[(before, after)]
+            self.pqueue.remove((x, y, before, after))
+            heapq.heapify(self.pqueue)
+        bcross, x, y = segment.intersect(before)
+        if bcross:
+            heapq.heappush(self.pqueue, (x, y, before, segment))
+            self.crossings[(before, segment)] = (x, y)
+        across, x, y = segment.intersect(after)
+        if across:
+            heapq.heappush(self.pqueue, (x, y, segment, after))
+            self.crossings[(segment, after)] = (x, y)
+
+    def right_endpoint(self, segment):
+        before = self.bst.find_previous(segment)
+        after = self.bst.find_next(segment)
+        self.bst.delete(segment)
+        bacross, x, y = before.intersect(after)
+        if bacross:
+            heapq.heappush(self.pqueue, (x, y, before, after))
+            self.crossings[(before, after)] = (x, y)
+
+    def crossing(self, x, y, segment1, segment2):
+        if segment1.y1 < y:
+            below = segment1
+            above = segment2
+        else:
+            below = segment2
+            above = segment1
+
+        before = self.bst.find_previous(below)
+        after = self.bst.find_next(above)
+        self.bst.swap(below, above)
+
+        if (before, below) in self.crosings:
+            x, y = self.crossings[(before, below)]
+            self.pqueue.remove((x, y, before, below))
+            heapq.heapify(self.pqueue)
+        if (above, after) in self.crossings:
+            x, y = self.crossings[(above, after)]
+            self.pqueue.remove((x, y, above, after))
+            heapq.heapify(self.pqueue)
+
+
+        cross1, x, y = before.intersect(above)
+        if cross1:
+            heapq.heappush(self.pqueue, (x, y, before, above))
+            self.crossings[(before, above)] = (x, y)
+        cross2, x, y = below.intersect(after)
+        if cross2:
+            heapq.heappush(self.pqueue, (x, y, below, after))
+            self.crossings[(below, after)] = (x, y)
 
 class TermBST(object):
 
@@ -805,7 +881,43 @@ class TermBST(object):
             root.right = self.insert_helper(root.right, segment)
         return root
 
-    def delete(self, node):
+    def swap(self, segment1, segment2):
+        node1 = self.find(segment1)
+        node2 = self.find(segment2)
+        node1.segment = segment2
+        node2.segment = segment1
+
+    def find(self, segment):
+        return self.find_helper(self.root, segment)
+
+    def find_helper(self, root, segment):
+        if root is None or root.segment == segment:
+            return root
+        elif root.segment > segment:
+            return self.find_helper(root.left, segment)
+        else:
+            return self.find_helper(root.right, segment)
+
+    def find_previous(self, segment):
+        node = self.find(segment)
+        predecessor = node.left
+        last = predecessor
+        while predecessor:
+            last = predecessor
+            predecessor = predecessor.right
+        return last.segment
+
+    def find_next(self, segment):
+        node = self.find(segment)
+        successor = node.right
+        last = successor
+        while successor:
+            last = successor
+            successor = successor.left
+        return last.segment
+
+    def delete(self, segment):
+        node = self.find(segment)
         self.root = self.delete_helper(self.root, node)
 
     def delete_helper(self, root, node):
@@ -847,10 +959,56 @@ class TermSegment(object):
         self.e1 = e1
         self.e2 = e2
 
+        self.p1 = (x1, y1)
+        self.p2 = (x2, y2)
+        self.pdiff = (x2 - x1, y2 - y1)
+        if x1 < x2:
+            self.left = (x1, y1)
+            self.right = (x2, y2)
+        else:
+            self.left = (x2, y2)
+            self.right = (x1, y1)
+
         self.start = None
         self.end = None
         self.octant = -1
         self.gridlist = []
+
+    def is_left_endpoint(self, x, y):
+        if abs(x - self.left[0]) < 1e-6 and abs(y - self.left[1] < 1e-6):
+            return True
+        return False
+
+    def is_right_endpoint(self, x, y):
+        if abs(x - self.right[0]) < 1e-6 and abs(y - self.right[1] < 1e-6):
+            return True
+        return False
+
+
+    def intersect(self, other):
+        # See: stackoverflow.com/questions/563198
+        diffcross = self.cross2D(self.pdiff, other.pdiff)
+        initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), self.pdiff)
+
+        if diffcross == 0 and initcross == 0: # Co-linear
+            # Impossible for our purposes -- we do not count intersection at
+            # end points
+            return (False, 0, 0)
+        elif diffcross == 0: # parallel
+            return (False, 0, 0)
+        elif initcross == 0: # intersection!
+            offset = initcross / diffcross
+            xi = other.x1 + offset * other.pdiff[0]
+            yi = other.y1 + offset * other.pdiff[1]
+            if abs(xi - self.x1) < 1e-6 or abs(xi - self.x2) < 1e-6:
+                return (False, 0, 0) # Do not count end points
+            else:
+                return (True, xi, y1)
+        else: # no intersection
+            return (False, 0, 0)
+
+    def cross2D(self, p1, p2):
+        return p1[0] * p2[1] - p1[0] * p2[1]
 
     def __eq__(self, other):
         return (self.x1 == other.x1

@@ -802,7 +802,7 @@ class TermDAG(object):
 
         while self.pqueue:
             x1, y1, segment1, segment2 = heapq.heappop(self.pqueue)
-            print "Popping", x1, y1, segment1, segment2
+            print "     Popping", x1, y1, segment1, segment2
             if segment1.is_left_endpoint(x1, y1):
                 self.left_endpoint(segment1)
             elif segment1.is_right_endpoint(x1, y1):
@@ -812,7 +812,8 @@ class TermDAG(object):
 
     def left_endpoint(self, segment):
         self.bst.insert(segment)
-        print "Adding", segment
+        print "     Adding", segment
+        self.bst.print_tree()
         before = self.bst.find_previous(segment)
         after = self.bst.find_next(segment)
         if (before, after) in self.crossings:
@@ -827,12 +828,15 @@ class TermDAG(object):
         if across:
             heapq.heappush(self.pqueue, (x, y, segment, after))
             self.crossings[(segment, after)] = (x, y)
+        if before or after:
+            print "CHECK: ", segment, before, bcross, after, across
 
     def right_endpoint(self, segment):
         before = self.bst.find_previous(segment)
         after = self.bst.find_next(segment)
-        print "Deleting", segment
+        print "     Deleting", segment
         self.bst.delete(segment)
+        self.bst.print_tree()
         if before:
             bacross, x, y = before.intersect(after)
             if bacross:
@@ -850,7 +854,8 @@ class TermDAG(object):
         before = self.bst.find_previous(below)
         after = self.bst.find_next(above)
         self.bst.swap(below, above)
-        print "Swapping", below, above
+        print "     Swapping", below, above
+        self.bst.print_tree()
 
         if (before, below) in self.crosings:
             x, y = self.crossings[(before, below)]
@@ -901,10 +906,10 @@ class TermBST(object):
         if root is None or root.segment == segment:
             return root
         elif root.segment > segment:
-            print "Left on", segment, root.segment
+            #print "   Left on", segment, root.segment
             return self.find_helper(root.left, segment)
         else:
-            print "Right on", segment, root.segment
+            #print "   Right on", segment, root.segment
             return self.find_helper(root.right, segment)
 
     def find_previous(self, segment):
@@ -920,7 +925,17 @@ class TermBST(object):
         if last:
             return last.segment
         else:
-            return last
+            predecessor = None
+            search = self.root
+            while search:
+                if segment > search.segment:
+                    predecessor = search.segment
+                    search = search.right
+                elif segment < search.segment:
+                    search = search.left
+                else:
+                    break
+            return predecessor
 
     def find_next(self, segment):
         node = self.find(segment)
@@ -935,10 +950,19 @@ class TermBST(object):
         if last:
             return last.segment
         else:
-            return last
+            successor = None
+            search = self.root
+            while search:
+                if segment < search.segment:
+                    successor = search.segment
+                    search = search.left
+                elif segment > search.segment:
+                    search = search.right
+                else:
+                    break
+            return successor
 
     def delete(self, segment):
-        print segment, "for deletion"
         node = self.find(segment)
         if node is None:
             print "ERROR, could not find", segment, "in delete"
@@ -947,7 +971,7 @@ class TermBST(object):
         self.root = self.delete_helper(self.root, node)
 
     def delete_helper(self, root, node):
-        if root == node:
+        if root.segment == node.segment:
             if node.left is None and node.right is None:
                 return None
             elif node.left is None:
@@ -970,9 +994,21 @@ class TermBST(object):
                 root.left = self.delete_helper(root.left, node)
             else:
                 root.right = self.delete_helper(root.right, node)
+            return root
 
     def print_tree(self):
-        print self.tree_to_list()
+        #print self.tree_to_list()
+        print '---'
+        if self.root:
+            self.print_tree_helper(self.root, '')
+        print '---'
+
+    def print_tree_helper(self, root, indent):
+        if root.left:
+            self.print_tree_helper(root.left, indent + '   ')
+        print indent, root.segment
+        if root.right:
+            self.print_tree_helper(root.right, indent + '   ')
 
     def tree_to_list(self):
         lst = []
@@ -1029,13 +1065,13 @@ class TermSegment(object):
         self.gridlist = []
 
     def is_left_endpoint(self, x, y):
-        print 'Left check', x, y, self.left
+        print '   Left check', x, y, self.left
         if abs(x - self.left[0]) < 1e-6 and abs(y - self.left[1]) < 1e-6:
             return True
         return False
 
     def is_right_endpoint(self, x, y):
-        print 'Right check', x, y, self.right
+        print '   Right check', x, y, self.right
         if abs(x - self.right[0]) < 1e-6 and abs(y - self.right[1]) < 1e-6:
             return True
         return False

@@ -39,6 +39,7 @@ can take a number of specs as input.
 """
 
 import heapq
+from heapq import *
 import curses
 import curses.ascii
 import gv
@@ -572,6 +573,7 @@ class TermDAG(object):
         #    print segment
 
         self.find_crossings(segments)
+        print "CROSSINGS ARE: "
         for k, v in self.crossings.items():
             print k, v
 
@@ -800,15 +802,17 @@ class TermDAG(object):
 
         while self.pqueue:
             x1, y1, segment1, segment2 = heapq.heappop(self.pqueue)
-            if segment.is_left_endpoint(x1, y1):
+            print "Popping", x1, y1, segment1, segment2
+            if segment1.is_left_endpoint(x1, y1):
                 self.left_endpoint(segment1)
-            elif segment.is_right_endpoint(x1, y1):
-                self.right_endpoint(segment2)
+            elif segment1.is_right_endpoint(x1, y1):
+                self.right_endpoint(segment1)
             else:
                 self.crossing(x1, y1, segment1, segment2)
 
     def left_endpoint(self, segment):
         self.bst.insert(segment)
+        print "Adding", segment
         before = self.bst.find_previous(segment)
         after = self.bst.find_next(segment)
         if (before, after) in self.crossings:
@@ -827,11 +831,13 @@ class TermDAG(object):
     def right_endpoint(self, segment):
         before = self.bst.find_previous(segment)
         after = self.bst.find_next(segment)
+        print "Deleting", segment
         self.bst.delete(segment)
-        bacross, x, y = before.intersect(after)
-        if bacross:
-            heapq.heappush(self.pqueue, (x, y, before, after))
-            self.crossings[(before, after)] = (x, y)
+        if before:
+            bacross, x, y = before.intersect(after)
+            if bacross:
+                heapq.heappush(self.pqueue, (x, y, before, after))
+                self.crossings[(before, after)] = (x, y)
 
     def crossing(self, x, y, segment1, segment2):
         if segment1.y1 < y:
@@ -844,6 +850,7 @@ class TermDAG(object):
         before = self.bst.find_previous(below)
         after = self.bst.find_next(above)
         self.bst.swap(below, above)
+        print "Swapping", below, above
 
         if (before, below) in self.crosings:
             x, y = self.crossings[(before, below)]
@@ -854,11 +861,11 @@ class TermDAG(object):
             self.pqueue.remove((x, y, above, after))
             heapq.heapify(self.pqueue)
 
-
-        cross1, x, y = before.intersect(above)
-        if cross1:
-            heapq.heappush(self.pqueue, (x, y, before, above))
-            self.crossings[(before, above)] = (x, y)
+        if before:
+            cross1, x, y = before.intersect(above)
+            if cross1:
+                heapq.heappush(self.pqueue, (x, y, before, above))
+                self.crossings[(before, above)] = (x, y)
         cross2, x, y = below.intersect(after)
         if cross2:
             heapq.heappush(self.pqueue, (x, y, below, after))
@@ -894,30 +901,49 @@ class TermBST(object):
         if root is None or root.segment == segment:
             return root
         elif root.segment > segment:
+            print "Left on", segment, root.segment
             return self.find_helper(root.left, segment)
         else:
+            print "Right on", segment, root.segment
             return self.find_helper(root.right, segment)
 
     def find_previous(self, segment):
         node = self.find(segment)
+        if node is None:
+            print "ERROR, could not find", segment, " in find_previous"
+            return None
         predecessor = node.left
         last = predecessor
         while predecessor:
             last = predecessor
             predecessor = predecessor.right
-        return last.segment
+        if last:
+            return last.segment
+        else:
+            return last
 
     def find_next(self, segment):
         node = self.find(segment)
+        if node is None:
+            print "ERROR, could not find", segment, " in find_next"
+            return None
         successor = node.right
         last = successor
         while successor:
             last = successor
             successor = successor.left
-        return last.segment
+        if last:
+            return last.segment
+        else:
+            return last
 
     def delete(self, segment):
+        print segment, "for deletion"
         node = self.find(segment)
+        if node is None:
+            print "ERROR, could not find", segment, "in delete"
+            self.print_tree()
+            return
         self.root = self.delete_helper(self.root, node)
 
     def delete_helper(self, root, node):
@@ -930,17 +956,36 @@ class TermBST(object):
                 return node.left
             else:
                 predecessor = node.left
+                last = predecessor
                 while predecessor:
+                    last = predecessor
                     predecessor = predecessor.right
-                segment = predecessor.segment
-                self.delete(predecessor)
+                segment = last.segment
+                last.segment = node.segment
                 node.segment = segment
+                self.delete(last.segment)
                 return node
         else:
             if root.segment > node.segment:
                 root.left = self.delete_helper(root.left, node)
             else:
                 root.right = self.delete_helper(root.right, node)
+
+    def print_tree(self):
+        print self.tree_to_list()
+
+    def tree_to_list(self):
+        lst = []
+        lst = self.tree_to_list_helper(self.root, lst)
+        return lst
+
+    def tree_to_list_helper(self, root, lst):
+        if root.left:
+            lst = self.tree_to_list_helper(root.left, lst)
+        lst.append(root.segment)
+        if root.right:
+            lst = self.tree_to_list_helper(root.right, lst)
+        return lst
 
 class TermBSTNode(object):
 
@@ -952,6 +997,7 @@ class TermBSTNode(object):
 class TermSegment(object):
 
     def __init__(self, x1, y1, x2, y2, e1 = False, e2 = False):
+        print "Initting", x1, y1, x2, y2
         self.x1 = x1
         self.x2 = x2
         self.y1 = y1
@@ -965,9 +1011,17 @@ class TermSegment(object):
         if x1 < x2:
             self.left = (x1, y1)
             self.right = (x2, y2)
+        elif abs(x1 - x2) < 1e-6:
+            if y1 < y2:
+                self.left = (x1, y1)
+                self.right = (x2, y2)
+            else:
+                self.left = (x2, y2)
+                self.right = (x1, y1)
         else:
             self.left = (x2, y2)
             self.right = (x1, y1)
+        print "  with L/R:", self.left, self.right
 
         self.start = None
         self.end = None
@@ -975,17 +1029,22 @@ class TermSegment(object):
         self.gridlist = []
 
     def is_left_endpoint(self, x, y):
-        if abs(x - self.left[0]) < 1e-6 and abs(y - self.left[1] < 1e-6):
+        print 'Left check', x, y, self.left
+        if abs(x - self.left[0]) < 1e-6 and abs(y - self.left[1]) < 1e-6:
             return True
         return False
 
     def is_right_endpoint(self, x, y):
-        if abs(x - self.right[0]) < 1e-6 and abs(y - self.right[1] < 1e-6):
+        print 'Right check', x, y, self.right
+        if abs(x - self.right[0]) < 1e-6 and abs(y - self.right[1]) < 1e-6:
             return True
         return False
 
 
     def intersect(self, other):
+        if other is None:
+            return (False, 0, 0)
+
         # See: stackoverflow.com/questions/563198
         diffcross = self.cross2D(self.pdiff, other.pdiff)
         initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), self.pdiff)
@@ -1011,6 +1070,8 @@ class TermSegment(object):
         return p1[0] * p2[1] - p1[0] * p2[1]
 
     def __eq__(self, other):
+        if other is None:
+            return False
         return (self.x1 == other.x1
             and self.x2 == other.x2
             and self.y1 == other.y1
@@ -1020,9 +1081,18 @@ class TermSegment(object):
 
     # For the line-sweep algorithm
     def __lt__(self, other):
-        if self.x1 < self.x2:
+        if self.x1 == other.x1:
+            if self.y1 == other.y1:
+                if self.x2 == other.x2:
+                    if self.y2 < other.y2:
+                        return True
+                elif self.x2 < other.x2:
+                    return True
+            elif self.y1 < other.y1:
+                return True
+        elif self.x1 < other.x1:
             return True
-        elif self.y1 < self.y2:
+        elif self.y1 < other.y1:
             return True
 
         return False

@@ -609,8 +609,10 @@ class TermDAG(object):
             node._col = column_multiplier * col_lookup[coord[0]]
             if node.real:
                 self.grid[node._row][node._col] = 'o'
-            elif node._in_segments > 0:
-                self.grid[node._row][node._col] = '.'
+            #elif node.has_vertical():
+            #    self.grid[node._row][node._col] = '|'
+            #elif node._in_segments > 0:
+            #    self.grid[node._row][node._col] = '.'
             else:
                 self.grid[node._row][node._col] = '.'
 
@@ -1193,6 +1195,12 @@ class TermNode(object):
 
     def add_out_link(self, link):
         self._out_links.append(link)
+
+    def has_vertical(self):
+        for segment in self._in_segments:
+            if segment.x1 == self._x:
+                return True
+        return False
 
 class TermLink(object):
 

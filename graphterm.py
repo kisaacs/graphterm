@@ -859,12 +859,14 @@ class TermDAG(object):
 
         if (before, below) in self.crossings:
             x, y = self.crossings[(before, below)]
-            self.pqueue.remove((x, y, before, below))
-            heapq.heapify(self.pqueue)
+            if (x, y, before, below) in self.pqueue:
+                self.pqueue.remove((x, y, before, below))
+                heapq.heapify(self.pqueue)
         if (above, after) in self.crossings:
             x, y = self.crossings[(above, after)]
-            self.pqueue.remove((x, y, above, after))
-            heapq.heapify(self.pqueue)
+            if (x, y, above, after) in self.pqueue:
+                self.pqueue.remove((x, y, above, after))
+                heapq.heapify(self.pqueue)
 
         if before:
             cross1, x, y = before.intersect(above)

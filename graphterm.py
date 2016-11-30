@@ -857,7 +857,7 @@ class TermDAG(object):
         print "     Swapping", below, above
         self.bst.print_tree()
 
-        if (before, below) in self.crosings:
+        if (before, below) in self.crossings:
             x, y = self.crossings[(before, below)]
             self.pqueue.remove((x, y, before, below))
             heapq.heapify(self.pqueue)
@@ -1092,8 +1092,9 @@ class TermSegment(object):
             return (False, 0, 0)
         else: # intersection!
             offset = initcross / diffcross
-            print " - offset is", offset
-            if offset > 0 and offset < 1:
+            offset2 = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), other.pdiff) / diffcross
+            print " - offsets are", offset, offset2
+            if offset > 0 and offset < 1 and offset2 > 0 and offset2 < 1:
                 xi = other.x1 + offset * other.pdiff[0]
                 yi = other.y1 + offset * other.pdiff[1]
                 print " - points are:", xi, yi

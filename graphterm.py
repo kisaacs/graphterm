@@ -535,13 +535,13 @@ class TermDAG(object):
 
                 if (coord[0], coord[1]) in coord_to_node:
                     placer = coord_to_node[(coord[0], coord[1])]
-                    #placer._in_segments.append(segment)
+                    placer._in_segments.append(segment)
                     segment.end = placer
                 else:
                     placer = TermNode("", None, False)
                     coord_to_node[(coord[0], coord[1])] = placer
                     coord_to_placer[(coord[0], coord[1])] = placer
-                    #placer._in_segments.append(segment)
+                    placer._in_segments.append(segment)
                     placer._x = coord[0]
                     placer._y = coord[1]
                     segment.end = placer
@@ -555,7 +555,7 @@ class TermDAG(object):
                 self._nodes[link.sink]._y, last_node, True)
             placer = coord_to_node[last]
             #placer._out_segments.append(segment)
-            #self._nodes[link.sink]._in_segments.append(segment)
+            self._nodes[link.sink]._in_segments.append(segment)
             segment.start = placer
             segment.end = self._nodes[link.sink]
             segments.add(segment)
@@ -582,7 +582,9 @@ class TermDAG(object):
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
         ysort.reverse()
-        self.gridsize = [len(ysort) * 2, len(xsort) * 2]
+        column_multiplier = 4
+        row_multiplier = 2
+        self.gridsize = [len(ysort) * row_multiplier, len(xsort) * column_multiplier]
         self.write_tulip_positions();
         print "xset", xsort
         print "yset", ysort
@@ -603,10 +605,12 @@ class TermDAG(object):
             row_lookup[y] = i
 
         for coord, node in coord_to_node.items():
-            node._row = 2 * row_lookup[coord[1]]
-            node._col = 2 * col_lookup[coord[0]]
+            node._row = row_multiplier * row_lookup[coord[1]]
+            node._col = column_multiplier * col_lookup[coord[0]]
             if node.real:
                 self.grid[node._row][node._col] = 'o'
+            elif node._in_segments > 0:
+                self.grid[node._row][node._col] = '.'
             else:
                 self.grid[node._row][node._col] = '.'
 
@@ -1088,6 +1092,7 @@ class TermSegment(object):
         other = TermSegment(node._x, node._y, self.x2, self.y2, False, self.e2)
         other.start = node
         other.end = self.end
+        node._in_segments.append(self)
         self.end = node
         self.x2 = node._x
         self.y2 = node._y
@@ -1181,7 +1186,7 @@ class TermNode(object):
         self.tulipNode = tulip
 
         self.real = real
-
+        self._in_segments = []
 
     def add_in_link(self, link):
         self._in_links.append(link)

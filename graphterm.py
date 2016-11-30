@@ -535,30 +535,49 @@ class TermDAG(object):
 
                 if (coord[0], coord[1]) in coord_to_node:
                     placer = coord_to_node[(coord[0], coord[1])]
-                    placer._in_segments.append(segment)
+                    #placer._in_segments.append(segment)
                     segment.end = placer
                 else:
                     placer = TermNode("", None, False)
                     coord_to_node[(coord[0], coord[1])] = placer
                     coord_to_placer[(coord[0], coord[1])] = placer
-                    placer._in_segments.append(segment)
+                    #placer._in_segments.append(segment)
                     placer._x = coord[0]
                     placer._y = coord[1]
                     segment.end = placer
 
 
-                coord_to_node[last]._out_segments.append(segment)
+                #coord_to_node[last]._out_segments.append(segment)
                 last = (coord[0], coord[1])
                 last_node = False
 
             segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
                 self._nodes[link.sink]._y, last_node, True)
             placer = coord_to_node[last]
-            placer._out_segments.append(segment)
-            self._nodes[link.sink]._in_segments.append(segment)
+            #placer._out_segments.append(segment)
+            #self._nodes[link.sink]._in_segments.append(segment)
             segment.start = placer
             segment.end = self._nodes[link.sink]
             segments.add(segment)
+
+        self.find_crossings(segments)
+        print "CROSSINGS ARE: "
+        for k, v in self.crossings.items():
+            print k, v
+            segment1, segment2 = k
+            x, y = v
+            placer = TermNode('', None, False)
+            placer._x = x
+            placer._y = y
+            coord_to_node[(x,y)] = placer
+            coord_to_placer[(x,y)] = placer
+            new_segment1 = segment1.split(placer)
+            new_segment2 = segment2.split(placer)
+            segments.add(new_segment1)
+            segments.add(new_segment2)
+            xset.add(x)
+            yset.add(y)
+
 
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
@@ -571,11 +590,6 @@ class TermDAG(object):
         tlp.saveGraph(self._tulip, 'test.tlp')
         #for segment in segments:
         #    print segment
-
-        self.find_crossings(segments)
-        print "CROSSINGS ARE: "
-        for k, v in self.crossings.items():
-            print k, v
 
         for i in range(self.gridsize[0]):
             self.grid.append([' ' for j in range(self.gridsize[1])])
@@ -597,9 +611,9 @@ class TermDAG(object):
                 self.grid[node._row][node._col] = '.'
 
         for segment in segments:
-            print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
+            #print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
             segment.gridlist =  self.bresenham(segment)
-            print segment.gridlist
+            #print segment.gridlist
             self.set_to_grid(segment)
             #self.print_grid()
 
@@ -610,18 +624,21 @@ class TermDAG(object):
         end = segment.end
         last_x = start._col
         last_y = start._row
+        print '   Drawing segment', segment, segment.gridlist
         for coord in segment.gridlist:
             x, y = coord
             char = self.link_char(last_x, last_y, x, y)
+            print 'Drawing', char, 'at', x, y
             if char == '':
                 continue
             if self.grid[y][x] == ' ':
                 self.grid[y][x] = char
             elif char != self.grid[y][x]:
-                print 'ERROR at', x, y, ' : ', char, 'vs', self.grid[y][x]
+                print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
                 self.grid[y][x] = 'X'
             last_x = x
             last_y = y
+            self.print_grid()
 
     # We need to see where we were to see where we go next.
     # If both x & y change: use a slash, back if pos, forward if neg
@@ -802,7 +819,7 @@ class TermDAG(object):
 
         while self.pqueue:
             x1, y1, segment1, segment2 = heapq.heappop(self.pqueue)
-            print "     Popping", x1, y1, segment1, segment2
+            #print "     Popping", x1, y1, segment1, segment2
             if segment1.is_left_endpoint(x1, y1):
                 self.left_endpoint(segment1)
             elif segment1.is_right_endpoint(x1, y1):
@@ -812,8 +829,8 @@ class TermDAG(object):
 
     def left_endpoint(self, segment):
         self.bst.insert(segment)
-        print "     Adding", segment
-        self.bst.print_tree()
+        #print "     Adding", segment
+        #self.bst.print_tree()
         before = self.bst.find_previous(segment)
         after = self.bst.find_next(segment)
         if (before, after) in self.crossings:
@@ -828,15 +845,15 @@ class TermDAG(object):
         if across:
             heapq.heappush(self.pqueue, (x, y, segment, after))
             self.crossings[(segment, after)] = (x, y)
-        if before or after:
-            print "CHECK: ", segment, before, bcross, after, across
+        #if before or after:
+        #    print "CHECK: ", segment, before, bcross, after, across
 
     def right_endpoint(self, segment):
         before = self.bst.find_previous(segment)
         after = self.bst.find_next(segment)
-        print "     Deleting", segment
+        #print "     Deleting", segment
         self.bst.delete(segment)
-        self.bst.print_tree()
+        #self.bst.print_tree()
         if before:
             bacross, x, y = before.intersect(after)
             if bacross:
@@ -854,8 +871,8 @@ class TermDAG(object):
         before = self.bst.find_previous(below)
         after = self.bst.find_next(above)
         self.bst.swap(below, above)
-        print "     Swapping", below, above
-        self.bst.print_tree()
+        #print "     Swapping", below, above
+        #self.bst.print_tree()
 
         if (before, below) in self.crossings:
             x, y = self.crossings[(before, below)]
@@ -1034,8 +1051,9 @@ class TermBSTNode(object):
 
 class TermSegment(object):
 
-    def __init__(self, x1, y1, x2, y2, e1 = False, e2 = False):
-        print "Initting", x1, y1, x2, y2
+    def __init__(self, x1, y1, x2, y2, e1 = None, e2 = None):
+        #print "Initting", x1, y1, x2, y2
+        # The e1 and e2 are whether the two endpoints exist as real nodes
         self.x1 = x1
         self.x2 = x2
         self.y1 = y1
@@ -1059,12 +1077,22 @@ class TermSegment(object):
         else:
             self.left = (x2, y2)
             self.right = (x1, y1)
-        print "  with L/R:", self.left, self.right
+        #print "  with L/R:", self.left, self.right
 
         self.start = None
         self.end = None
         self.octant = -1
         self.gridlist = []
+
+    def split(self, node):
+        other = TermSegment(node._x, node._y, self.x2, self.y2, False, self.e2)
+        other.start = node
+        other.end = self.end
+        self.end = node
+        self.x2 = node._x
+        self.y2 = node._y
+        self.e2 = False
+        return other
 
     def is_left_endpoint(self, x, y):
         if abs(x - self.left[0]) < 1e-6 and abs(y - self.left[1]) < 1e-6:
@@ -1084,7 +1112,7 @@ class TermSegment(object):
         # See: stackoverflow.com/questions/563198
         diffcross = self.cross2D(self.pdiff, other.pdiff)
         initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), self.pdiff)
-        print " - Intersecting", self, other, self.pdiff, other.pdiff, diffcross, other.x1, self.x1, other.y1, self.y1, initcross
+        #print " - Intersecting", self, other, self.pdiff, other.pdiff, diffcross, other.x1, self.x1, other.y1, self.y1, initcross
 
         if diffcross == 0 and initcross == 0: # Co-linear
             # Impossible for our purposes -- we do not count intersection at
@@ -1095,11 +1123,11 @@ class TermSegment(object):
         else: # intersection!
             offset = initcross / diffcross
             offset2 = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), other.pdiff) / diffcross
-            print " - offsets are", offset, offset2
+            #print " - offsets are", offset, offset2
             if offset > 0 and offset < 1 and offset2 > 0 and offset2 < 1:
                 xi = other.x1 + offset * other.pdiff[0]
                 yi = other.y1 + offset * other.pdiff[1]
-                print " - points are:", xi, yi
+                #print " - points are:", xi, yi
                 return (True, xi, yi)
             return (False, 0, 0)
 
@@ -1153,8 +1181,6 @@ class TermNode(object):
         self.tulipNode = tulip
 
         self.real = real
-        self._in_segments = list()
-        self._out_segments = list()
 
 
     def add_in_link(self, link):

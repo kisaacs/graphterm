@@ -1065,13 +1065,11 @@ class TermSegment(object):
         self.gridlist = []
 
     def is_left_endpoint(self, x, y):
-        print '   Left check', x, y, self.left
         if abs(x - self.left[0]) < 1e-6 and abs(y - self.left[1]) < 1e-6:
             return True
         return False
 
     def is_right_endpoint(self, x, y):
-        print '   Right check', x, y, self.right
         if abs(x - self.right[0]) < 1e-6 and abs(y - self.right[1]) < 1e-6:
             return True
         return False
@@ -1084,6 +1082,7 @@ class TermSegment(object):
         # See: stackoverflow.com/questions/563198
         diffcross = self.cross2D(self.pdiff, other.pdiff)
         initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), self.pdiff)
+        print " - Intersecting", self, other, self.pdiff, other.pdiff, diffcross, other.x1, self.x1, other.y1, self.y1, initcross
 
         if diffcross == 0 and initcross == 0: # Co-linear
             # Impossible for our purposes -- we do not count intersection at
@@ -1091,19 +1090,18 @@ class TermSegment(object):
             return (False, 0, 0)
         elif diffcross == 0: # parallel
             return (False, 0, 0)
-        elif initcross == 0: # intersection!
+        else: # intersection!
             offset = initcross / diffcross
-            xi = other.x1 + offset * other.pdiff[0]
-            yi = other.y1 + offset * other.pdiff[1]
-            if abs(xi - self.x1) < 1e-6 or abs(xi - self.x2) < 1e-6:
-                return (False, 0, 0) # Do not count end points
-            else:
-                return (True, xi, y1)
-        else: # no intersection
+            print " - offset is", offset
+            if offset > 0 and offset < 1:
+                xi = other.x1 + offset * other.pdiff[0]
+                yi = other.y1 + offset * other.pdiff[1]
+                print " - points are:", xi, yi
+                return (True, xi, yi)
             return (False, 0, 0)
 
     def cross2D(self, p1, p2):
-        return p1[0] * p2[1] - p1[0] * p2[1]
+        return p1[0] * p2[1] - p1[1] * p2[0]
 
     def __eq__(self, other):
         if other is None:

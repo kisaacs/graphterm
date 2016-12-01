@@ -616,6 +616,9 @@ class TermDAG(object):
             else:
                 self.grid[node._row][node._col] = '.'
 
+        # Sort segments on drawing difficulty
+        segments = sorted(segments, key = lambda x: x.for_segment_sort())
+
         for segment in segments:
             #print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
             segment.gridlist =  self.bresenham(segment)
@@ -1089,6 +1092,18 @@ class TermSegment(object):
         self.end = None
         self.octant = -1
         self.gridlist = []
+
+    def for_segment_sort(self):
+        xlen = abs(self.x1 - self.x2)
+        ylen = abs(self.y1 - self.y2)
+
+        seg = 0
+        # Pure vertical should sort smallest
+        if xlen > 0:
+            seg += 1000
+        # After that, number of characters:
+        seg += xlen + ylen
+        return seg
 
     def split(self, node):
         other = TermSegment(node._x, node._y, self.x2, self.y2, False, self.e2)

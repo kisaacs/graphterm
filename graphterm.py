@@ -662,24 +662,31 @@ class TermDAG(object):
             xdir = -1
 
         ydist = y2 - y1
+        xdist = abs(x2 - x1)
 
         moves = []
         # Vertical case
-        if x1 == x2:
-            for y in range(y1, y2):
-                moves.append((x1, y))
-            return moves
+        #if x1 == x2:
+        #    for y in range(y1, y2):
+        #        moves.append((x1, y))
+        #    return moves
 
         currentx = x1
-        print x1, x2, ydist, (x2 - xdir * (ydist))
-        for x in range(x1, x2 - xdir * (ydist), xdir):
-            print 'x is', x, y1
-            moves.append((x, y1))
-            currentx = x
-        for y in range(y1 + 1, y2 + 1):
-            currentx += xdir
-            print 'y is', y, 'currentx', currentx
-            moves.append((currentx, y))
+        currenty = y1
+        if ydist >= xdist:
+            for y in range(y1 + 1, y2 - xdist):
+                moves.append((x1, y))
+                currenty = y
+        else:
+            # Starting from currentx, move until just enough 
+            # room to go the y direction (minus 1... we don't go all the way)
+            for x in range(x1, x2 - xdir * (ydist - 1), xdir):
+                moves.append((x, y1))
+                currentx = x
+        if xdist != 0:
+            for y in range(currenty + 1, y2):
+                currentx += xdir
+                moves.append((currentx, y))
 
         return moves
 

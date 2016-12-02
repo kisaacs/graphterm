@@ -582,7 +582,7 @@ class TermDAG(object):
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
         ysort.reverse()
-        column_multiplier = 4
+        column_multiplier = 2
         row_multiplier = 2
         self.gridsize = [len(ysort) * row_multiplier, len(xsort) * column_multiplier]
         self.write_tulip_positions();
@@ -674,7 +674,10 @@ class TermDAG(object):
         currentx = x1
         currenty = y1
         if ydist >= xdist:
-            for y in range(y1 + 1, y2 - xdist):
+            # We don't ever quite travel the whole xdist -- so it's 
+            # xdist - 1 ... except in the pure vertical case where 
+            # xdist is already zero. Kind of strange isn't it?
+            for y in range(y1 + 1, y2 - max(0, xdist - 1)):
                 moves.append((x1, y))
                 currenty = y
         else:
@@ -683,10 +686,10 @@ class TermDAG(object):
             for x in range(x1, x2 - xdir * (ydist - 1), xdir):
                 moves.append((x, y1))
                 currentx = x
-        if xdist != 0:
-            for y in range(currenty + 1, y2):
-                currentx += xdir
-                moves.append((currentx, y))
+
+        for y in range(currenty + 1, y2):
+            currentx += xdir
+            moves.append((currentx, y))
 
         return moves
 

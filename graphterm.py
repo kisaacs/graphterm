@@ -623,7 +623,6 @@ class TermDAG(object):
             #print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
             segment.gridlist =  self.draw_line(segment)
             #segment.gridlist =  self.bresenham(segment)
-            print segment.gridlist
             self.set_to_grid(segment)
             #self.print_grid()
 

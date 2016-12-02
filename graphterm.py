@@ -621,8 +621,9 @@ class TermDAG(object):
 
         for segment in segments:
             #print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
-            segment.gridlist =  self.bresenham(segment)
-            #print segment.gridlist
+            segment.gridlist =  self.draw_line(segment)
+            #segment.gridlist =  self.bresenham(segment)
+            print segment.gridlist
             self.set_to_grid(segment)
             #self.print_grid()
 
@@ -648,6 +649,39 @@ class TermDAG(object):
             last_x = x
             last_y = y
             self.print_grid()
+
+    def draw_line(self, segment):
+        x1 = segment.start._col
+        y1 = segment.start._row
+        x2 = segment.end._col
+        y2 = segment.end._row
+
+        if x2 > x1:
+            xdir = 1
+        else:
+            xdir = -1
+
+        ydist = y2 - y1
+
+        moves = []
+        # Vertical case
+        if x1 == x2:
+            for y in range(y1, y2):
+                moves.append((x1, y))
+            return moves
+
+        currentx = x1
+        print x1, x2, ydist, (x2 - xdir * (ydist))
+        for x in range(x1, x2 - xdir * (ydist), xdir):
+            print 'x is', x, y1
+            moves.append((x, y1))
+            currentx = x
+        for y in range(y1 + 1, y2 + 1):
+            currentx += xdir
+            print 'y is', y, 'currentx', currentx
+            moves.append((currentx, y))
+
+        return moves
 
     # We need to see where we were to see where we go next.
     # If both x & y change: use a slash, back if pos, forward if neg

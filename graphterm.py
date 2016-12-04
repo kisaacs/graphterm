@@ -510,6 +510,7 @@ class TermDAG(object):
 
         xset = set()
         yset = set()
+        node_yset = set()
         segments = set()
         coord_to_node = dict()
         coord_to_placer = dict()
@@ -519,6 +520,7 @@ class TermDAG(object):
             node._y = coord[1]
             xset.add(coord[0])
             yset.add(coord[1])
+            node_yset.add(coord[1])
             coord_to_node[(coord[0], coord[1])] = node
 
         for link in self._links:
@@ -582,9 +584,19 @@ class TermDAG(object):
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
         ysort.reverse()
+        segment_pos = dict()
         column_multiplier = 2
         row_multiplier = 2
-        self.gridsize = [len(ysort) * row_multiplier, len(xsort) * column_multiplier]
+        self.gridsize = [len(ysort) - len(node_yset) + len(node_yset) * row_multiplier,
+            len(xsort) * column_multiplier]
+        y = 0
+        for ypos in ysort:
+            segment_pos[ypos] = y
+            if ypos in node_yset:
+                y += 1
+            y += 1
+
+
         self.write_tulip_positions();
         print "xset", xsort
         print "yset", ysort
@@ -605,16 +617,18 @@ class TermDAG(object):
             row_lookup[y] = i
 
         for coord, node in coord_to_node.items():
-            node._row = row_multiplier * row_lookup[coord[1]]
+            node._row = segment_pos[coord[1]]
             node._col = column_multiplier * col_lookup[coord[0]]
             if node.real:
+                print 'Drawing node at', node._row, node._col
                 self.grid[node._row][node._col] = 'o'
+                self.print_grid()
             #elif node.has_vertical():
             #    self.grid[node._row][node._col] = '|'
             #elif node._in_segments > 0:
             #    self.grid[node._row][node._col] = '.'
-            else:
-                self.grid[node._row][node._col] = '.'
+            #else:
+            #    self.grid[node._row][node._col] = '.'
 
         # Sort segments on drawing difficulty
         segments = sorted(segments, key = lambda x: x.for_segment_sort())
@@ -633,10 +647,11 @@ class TermDAG(object):
         end = segment.end
         last_x = start._col
         last_y = start._row
-        print '   Drawing segment', segment, segment.gridlist
+        print '   Drawing segment [', segment.start._col, ',', segment.start._row, '] to [', \
+            segment.end._col, ',', segment.end._row, ']', segment.gridlist, segment
         for coord in segment.gridlist:
-            x, y = coord
-            char = self.link_char(last_x, last_y, x, y)
+            x, y, char = coord
+            #char = self.link_char(last_x, last_y, x, y, last)
             print 'Drawing', char, 'at', x, y
             if char == '':
                 continue
@@ -654,14 +669,21 @@ class TermDAG(object):
         y1 = segment.start._row
         x2 = segment.end._col
         y2 = segment.end._row
+        print 'Drawing', x1, y1, x2, y2
+
+        if segment.start.real:
+            print 'Advancing due to segment start...'
+            y1 += 1
 
         if x2 > x1:
             xdir = 1
         else:
             xdir = -1
+        print 'xdir is', xdir
 
         ydist = y2 - y1
         xdist = abs(x2 - x1)
+        print 'xydist are', xdist, ydist
 
         moves = []
         # Vertical case
@@ -676,19 +698,26 @@ class TermDAG(object):
             # We don't ever quite travel the whole xdist -- so it's 
             # xdist - 1 ... except in the pure vertical case where 
             # xdist is already zero. Kind of strange isn't it?
-            for y in range(y1 + 1, y2 - max(0, xdist - 1)):
-                moves.append((x1, y))
+            for y in range(y1, y2 - max(0, xdist - 1)):
+                print 'moving vertical with', x1, y
+                moves.append((x1, y, '|'))
                 currenty = y
         else:
+            currenty = y1 - 1
             # Starting from currentx, move until just enough 
             # room to go the y direction (minus 1... we don't go all the way)
-            for x in range(x1, x2 - xdir * (ydist - 1), xdir):
-                moves.append((x, y1))
+            for x in range(x1 + xdir, x2 - xdir * (ydist), xdir):
+                print 'moving horizontal with', x, (y1 - 1)
+                moves.append((x, y1 - 1, '_'))
                 currentx = x
 
         for y in range(currenty + 1, y2):
             currentx += xdir
-            moves.append((currentx, y))
+            print 'moving diag to', currentx, y
+            if xdir == 1:
+                moves.append((currentx, y, '\\'))
+            else:
+                moves.append((currentx, y, '/'))
 
         return moves
 
@@ -696,12 +725,12 @@ class TermDAG(object):
     # If both x & y change: use a slash, back if pos, forward if neg
     # If only x changes: use an underscore
     # If only y changes: use a pipe
-    def link_char(self, x1, y1, x2, y2):
-        if x1 == x2 and y1 == y2:
-            return ''
-        elif x1 == x2:
+    def link_char(self, x1, y1, x2, y2, last = False):
+        #if x1 == x2 and y1 == y2:
+        #    return ''
+        if x1 == x2:
             return '|'
-        elif y1 == y2:
+        elif y1 == y2 and not last:
             return '_'
         elif x1 < x2:
             return '\\'

@@ -611,6 +611,8 @@ class TermDAG(object):
 
         row_lookup = dict()
         col_lookup = dict()
+        row_nodes = dict()
+        row_last = [0 for x in range(self.gridsize[0])]
         for i, x in enumerate(xsort):
             col_lookup[x] = i
         for i, y in enumerate(ysort):
@@ -623,6 +625,11 @@ class TermDAG(object):
                 print 'Drawing node at', node._row, node._col
                 self.grid[node._row][node._col] = 'o'
                 self.print_grid()
+                if node._row not in row_nodes:
+                    row_nodes[node._row] = []
+                row_nodes[node._row].append(node)
+                if node._col > row_last[node._row]:
+                    row_last[node._row] = node._col
             #elif node.has_vertical():
             #    self.grid[node._row][node._col] = '|'
             #elif node._in_segments > 0:
@@ -637,12 +644,12 @@ class TermDAG(object):
             #print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
             segment.gridlist =  self.draw_line(segment)
             #segment.gridlist =  self.bresenham(segment)
-            self.set_to_grid(segment)
+            row_last = self.set_to_grid(segment, row_last)
             #self.print_grid()
 
-        self.print_grid()
+        self.print_grid(row_nodes, row_last)
 
-    def set_to_grid(self, segment):
+    def set_to_grid(self, segment, row_last):
         start = segment.start
         end = segment.end
         last_x = start._col
@@ -660,9 +667,12 @@ class TermDAG(object):
             elif char != self.grid[y][x]:
                 print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
                 self.grid[y][x] = 'X'
+            if x > row_last[y]:
+                row_last[y] = x
             last_x = x
             last_y = y
             self.print_grid()
+        return row_last
 
     def draw_line(self, segment):
         x1 = segment.start._col
@@ -809,9 +819,31 @@ class TermDAG(object):
 
         print 'ERROR NO OCTANT'
 
-    def print_grid(self):
-        for row in self.grid:
-            print ''.join(row)
+    def print_grid(self, row_nodes = None, row_last = None):
+        if row_nodes is None:
+            for row in self.grid:
+                print ''.join(row)
+
+        else:
+            for row, nodes in row_nodes.items():
+                row_nodes[row] = sorted(nodes, key = lambda node: node._col)
+
+            for i, row in enumerate(self.grid):
+                names = ''
+                if i in row_nodes:
+                    nodes = row_nodes[i]
+                    first = nodes[-1].name
+                    rest = ''
+                    if len(nodes) > 1:
+                        for node in nodes[:-1]:
+                            if rest == '':
+                                rest = ' [ ' + node.name
+                            else:
+                                rest += ', ' + node.name
+                        rest += ' ]'
+                    names = first + rest
+                print ''.join(row), names
+
 
 
     def write_tulip_positions(self):

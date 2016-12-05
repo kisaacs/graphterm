@@ -605,18 +605,64 @@ class TermDAG(object):
         #for segment in segments:
         #    print segment
 
-        for i in range(self.gridsize[0]):
-            self.grid.append([' ' for j in range(self.gridsize[1])])
-            self.gridedge.append(0)
-
         row_lookup = dict()
         col_lookup = dict()
         row_nodes = dict()
-        row_last = [0 for x in range(self.gridsize[0])]
         for i, x in enumerate(xsort):
             col_lookup[x] = i
         for i, y in enumerate(ysort):
             row_lookup[y] = i
+
+        # Figure out how nodes map to rows so we can figure out label
+        # placement allowances
+        self.row_last = [0 for x in range(self.gridsize[0])]
+        for coord, node in coord_to_node.items():
+            node._row = segment_pos[coord[1]]
+            node._col = column_multiplier * col_lookup[coord[0]]
+            if node.real:
+                if node._row not in row_nodes:
+                    row_nodes[node._row] = []
+                row_nodes[node._row].append(node)
+                if node._col > self.row_last[node._row]:
+                    self.row_last[node._row] = node._col
+
+        # Keep them sorted
+        for row, nodes in row_nodes.items():
+            row_nodes[row] = sorted(nodes, key = lambda node: node._col)
+
+        row_max = self.gridsize[1]
+        self.row_names = dict()
+        names = ''
+        pos = 0
+        for row, nodes in row_nodes.items():
+            first = nodes[-1].name
+            nodes[-1].label_pos = pos
+            pos += len(first)
+            rest = ''
+            if len(nodes) > 1:
+                for node in nodes[:-1]:
+                    if rest == '':
+                        rest = ' [ ' + node.name
+                        node.label_pos = pos + 3
+                        pos += len(node.name) + 3
+                    else:
+                        rest += ', ' + node.name
+                        node.label_pos = pos + 2
+                        pos += len(node.name) + 2
+                rest += ' ]'
+            names = first + rest
+            row_max = max(row_max, self.gridsize[1] + 1 + len(names))
+            self.row_names[row] = names
+
+        # Max number of columns needed
+        self.gridsize[1] = row_max + 1
+
+
+        for i in range(self.gridsize[0]):
+            self.grid.append([' ' for j in range(self.gridsize[1])])
+            self.gridedge.append(0)
+
+
 
         for coord, node in coord_to_node.items():
             node._row = segment_pos[coord[1]]
@@ -628,8 +674,6 @@ class TermDAG(object):
                 if node._row not in row_nodes:
                     row_nodes[node._row] = []
                 row_nodes[node._row].append(node)
-                if node._col > row_last[node._row]:
-                    row_last[node._row] = node._col
             #elif node.has_vertical():
             #    self.grid[node._row][node._col] = '|'
             #elif node._in_segments > 0:
@@ -644,10 +688,19 @@ class TermDAG(object):
             #print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
             segment.gridlist =  self.draw_line(segment)
             #segment.gridlist =  self.bresenham(segment)
-            row_last = self.set_to_grid(segment, row_last)
+            self.row_last = self.set_to_grid(segment, self.row_last)
             #self.print_grid()
 
-        self.print_grid(row_nodes, row_last)
+        self.names_to_grid()
+
+        self.print_grid(row_nodes, self.row_last)
+
+    def names_to_grid(self, highlight = ''):
+        for row, names in self.row_names.items():
+            start = self.row_last[row] + 2 # Space between
+            for ch in names:
+                self.grid[row][start] = ch
+                start += 1
 
     def set_to_grid(self, segment, row_last):
         start = segment.start
@@ -820,31 +873,8 @@ class TermDAG(object):
         print 'ERROR NO OCTANT'
 
     def print_grid(self, row_nodes = None, row_last = None):
-        if row_nodes is None:
-            for row in self.grid:
-                print ''.join(row)
-
-        else:
-            for row, nodes in row_nodes.items():
-                row_nodes[row] = sorted(nodes, key = lambda node: node._col)
-
-            for i, row in enumerate(self.grid):
-                names = ''
-                if i in row_nodes:
-                    nodes = row_nodes[i]
-                    first = nodes[-1].name
-                    rest = ''
-                    if len(nodes) > 1:
-                        for node in nodes[:-1]:
-                            if rest == '':
-                                rest = ' [ ' + node.name
-                            else:
-                                rest += ', ' + node.name
-                        rest += ' ]'
-                    names = first + rest
-                print ''.join(row), names
-
-
+        for row in self.grid:
+            print ''.join(row)
 
     def write_tulip_positions(self):
         for node in self._nodes.values():

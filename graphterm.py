@@ -512,6 +512,7 @@ class TermDAG(object):
         yset = set()
         node_yset = set()
         segments = set()
+        segment_lookup = dict()
         coord_to_node = dict()
         coord_to_placer = dict()
         for node in self._nodes.values():
@@ -524,15 +525,22 @@ class TermDAG(object):
             coord_to_node[(coord[0], coord[1])] = node
 
         for link in self._links:
+            path = TermPath(self._nodes[link.source], self._nodes[link.sink])
             link._coords = viewLayout.getEdgeValue(link.tulipLink)
             last = (self._nodes[link.source]._x, self._nodes[link.source]._y)
             last_node = True
             for coord in link._coords:
                 xset.add(coord[0])
                 yset.add(coord[1])
-                segment = TermSegment(last[0], last[1], coord[0],
-                    coord[1], last_node, False)
-                segments.add(segment)
+                if (last[0], last[1], coord[0], coord[1]) in segment_lookup:
+                    segment = segment_lookup[(last[0], last[1], coord[0], coord[1])]
+                else:
+                    segment = TermSegment(last[0], last[1], coord[0],
+                        coord[1], last_node, False)
+                    segments.add(segment)
+                path.segments.append(segment)
+                self._nodes[link.source].in_paths[self._nodes[link.sink]] = path
+                self._nodes[link.sink].out_paths[self._nodes[link.source]] = path
                 segment.start = coord_to_node[last]
 
                 if (coord[0], coord[1]) in coord_to_node:
@@ -548,19 +556,21 @@ class TermDAG(object):
                     placer._y = coord[1]
                     segment.end = placer
 
-
                 #coord_to_node[last]._out_segments.append(segment)
                 last = (coord[0], coord[1])
                 last_node = False
 
-            segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
-                self._nodes[link.sink]._y, last_node, True)
+            if (last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y) in segment_lookup:
+                segment = segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)]
+            else:
+                segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
+                    self._nodes[link.sink]._y, last_node, False)
+                segments.add(segment)
             placer = coord_to_node[last]
             #placer._out_segments.append(segment)
             self._nodes[link.sink]._in_segments.append(segment)
             segment.start = placer
             segment.end = self._nodes[link.sink]
-            segments.add(segment)
 
         self.find_crossings(segments)
         print "CROSSINGS ARE: "
@@ -657,12 +667,9 @@ class TermDAG(object):
         # Max number of columns needed
         self.gridsize[1] = row_max + 1
 
-
         for i in range(self.gridsize[0]):
             self.grid.append([' ' for j in range(self.gridsize[1])])
             self.gridedge.append(0)
-
-
 
         for coord, node in coord_to_node.items():
             node._row = segment_pos[coord[1]]
@@ -1226,6 +1233,7 @@ class TermSegment(object):
         self.end = None
         self.octant = -1
         self.gridlist = []
+        self.paths = []
 
     def for_segment_sort(self):
         xlen = abs(self.x1 - self.x2)
@@ -1324,6 +1332,14 @@ class TermSegment(object):
     def __hash__(self):
         return hash(self.__repr__())
 
+class TermPath(object):
+
+    def __init__(self, to_node, from_node):
+        self.source = from_node
+        self.sink = to_node
+
+        self.segments = []
+
 class TermNode(object):
 
     def __init__(self, node_id, tulip, real = True):
@@ -1334,10 +1350,13 @@ class TermNode(object):
         self._y = -1
         self._col = 0
         self._row = 0
+        self.label_pos = -1
         self.tulipNode = tulip
 
         self.real = real
         self._in_segments = []
+        self.in_paths = dict()
+        self.out_paths = dict()
 
     def add_in_link(self, link):
         self._in_links.append(link)

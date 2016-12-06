@@ -564,6 +564,7 @@ class TermDAG(object):
                 segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
                     self._nodes[link.sink]._y)
                 segments.add(segment)
+            link.segments.append(segment)
             placer = coord_to_node[last]
             self._nodes[link.sink]._in_segments.append(segment)
             segment.start = placer
@@ -642,8 +643,8 @@ class TermDAG(object):
         row_max = self.gridsize[1]
         self.row_names = dict()
         names = ''
-        pos = 0
         for row, nodes in row_nodes.items():
+            pos = 0
             first = nodes[-1].name # Draw the last next to its node
             nodes[-1].label_pos = pos
             pos += len(first)
@@ -797,22 +798,150 @@ class TermDAG(object):
         for row in self.grid:
             print ''.join(row)
 
-    def print_interactive(self, stdscr):
+    def color_string(self, tup):
+        string = '(' + str(tup[0])
+        for val in tup[1:]:
+            string += ',' + str(val)
+        string += ')'
+        return string
+
+    def print_interactive(self, stdscr, has_colors = False):
+        height, width = stdscr.getmaxyx()
+        offset = height - self.gridsize[0] - 1
+
+        stdscr.move(0, 0)
+        for i in range(0, curses.COLORS):
+            fg, bg = curses.pair_content(i + 1)
+            if i % 8 == 0:
+                stdscr.move(i / 8, 0)
+            stdscr.addstr(self.color_string(curses.color_content(fg)), curses.color_pair(i + 1))
+
+
+        # Draw initial grid and initialize colors to default
         for h in range(self.gridsize[0]):
             for w in range(self.gridsize[1]):
                 if self.grid[h][w] != '':
-                    stdscr.addch(h, w, self.grid[h][w])
+                    stdscr.addch(h + offset, w, self.grid[h][w])
                 else:
                     continue
 
         stdscr.refresh()
 
+        stdscr.move(height - 1, 0)
+        command = ''
+        selected = ''
         while True:
             ch = stdscr.getch()
             if ch == curses.KEY_MOUSE:
                 pass
-            elif ch == ord('q') or ch == ord('Q'):
-                return
+            elif command == '': # Awaiting new Command
+
+                # Quit
+                if ch == ord('q') or ch == ord('Q') or ch == curses.KEY_ENTER \
+                    or ch == 10:
+                    return
+
+                # Start Node Selection
+                elif ch == ord('/'):
+                    ch = curses.ascii.unctrl(ch)
+                    command = ch
+                    stdscr.addstr(ch)
+                    stdscr.refresh()
+
+                # Start Ctrl Command
+                else:
+                    ch = curses.ascii.unctrl(ch)
+                    if ch[0] == '^' and len(ch) > 1:
+                        if (ch[1] == 'a' or ch[1] == 'A') and selected:
+                            self.highlight_neighbors(stdscr, selected, offset)
+                            stdscr.move(height - 1, 0)
+                            stdscr.refresh()
+
+            else: # Command in progress
+
+                # Accept Command
+                if ch == curses.KEY_ENTER or ch == 10:
+                    # Clear existing highlights
+                    self.redraw_default(stdscr, offset)
+
+                    selected = self.highlight_node(stdscr, command[1:], offset, 7) # Cyan
+                    stdscr.move(height - 1, 0)
+                    for i in range(len(command)):
+                        stdscr.addstr(' ')
+                    stdscr.move(height - 1, 0)
+                    command = ''
+                    stdscr.refresh()
+
+                # Handle Backspace
+                elif ch == curses.KEY_BACKSPACE:
+                    command = command[:-1]
+                    stdscr.move(height - 1, len(command))
+                    stdscr.addstr(' ')
+                    stdscr.move(height - 1, len(command))
+                    stdscr.refresh()
+
+                # New character
+                else:
+                    ch = curses.ascii.unctrl(ch)
+                    command += ch
+                    stdscr.addstr(ch)
+                    stdscr.refresh()
+
+    def highlight_neighbors(self, stdscr, name, offset):
+        """We assume that the node in question is already highlighted."""
+
+        node = self._nodes[name]
+
+        debug = 1
+        for link in node._in_links:
+            neighbor = self._nodes[link.source]
+
+            stdscr.addstr(debug, 0, 'Starting node: ' + neighbor.name)
+            debug += 1
+            self.highlight_node(stdscr, neighbor.name, offset, 5)
+            debug = self.highlight_segments(stdscr, link.segments, offset, debug)
+
+        for link in node._out_links:
+            neighbor = self._nodes[link.sink]
+            self.highlight_node(stdscr, neighbor.name, offset, 5)
+            self.highlight_segments(stdscr, link.segments, offset)
+
+    def highlight_segments(self, stdscr, segments, offset, debug):
+        for segment in segments:
+            stdscr.addstr(debug, 0, 'Starting segment: ' + str(segment.gridlist))
+            debug += 1
+            for coord in segment.gridlist:
+                x, y, char = coord
+                stdscr.addstr(debug, 0, str(coord))
+                debug += 1
+                if char == '':
+                    continue
+                if self.grid[y][x] == ' ' or self.grid[y][x] == char:
+                    stdscr.addch(y + offset, x, char, curses.color_pair(5))
+                elif char != self.grid[y][x]:
+                    stdscr.addch(y + offset, x, 'X', curses.color_pair(5))
+        return debug
+
+    def highlight_node(self, stdscr, name, offset, color):
+        if name not in self._nodes:
+            return ''
+
+        node = self._nodes[name]
+        stdscr.addch(node._row + offset, node._col, 'o', curses.color_pair(color))
+        label_offset = self.row_last[node._row] + 2
+        for i, ch in enumerate(node.name):
+            stdscr.addch(node._row + offset, label_offset + node.label_pos + i,
+                ch, curses.color_pair(color))
+
+        return name
+
+    def redraw_default(self, stdscr, offset):
+        for h in range(self.gridsize[0]):
+            for w in range(self.gridsize[1]):
+                if self.grid[h][w] != '':
+                    stdscr.addch(h + offset, w, self.grid[h][w])
+                else:
+                    continue
 
     def write_tulip_positions(self):
         for node in self._nodes.values():
@@ -1381,8 +1510,11 @@ def graph_interactive(spec, **kwargs):
 
 def interactive_helper(stdscr, graph, spec, **kwargs):
     curses.start_color()
+    can_color = curses.has_colors()
     curses.use_default_colors()
-    graph.print_interactive(stdscr)
+    for i in range(0, curses.COLORS):
+        curses.init_pair(i + 1, i, -1)
+    graph.print_interactive(stdscr, can_color)
 
 
 def graph_dot(*specs, **kwargs):

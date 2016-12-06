@@ -564,7 +564,7 @@ class TermDAG(object):
                 segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
                     self._nodes[link.sink]._y)
                 segments.add(segment)
-                segment_lookup[(last[0], last[1], coord[0], coord[1])] = segment
+                segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)] = segment
             link.segments.append(segment)
             segment.links.append(segment)
             placer = coord_to_node[last]
@@ -868,6 +868,7 @@ class TermDAG(object):
                     self.redraw_default(stdscr, offset)
 
                     selected = self.highlight_node(stdscr, command[1:], offset, 7) # Cyan
+                    self.highlight_neighbors(stdscr, selected, offset)
                     stdscr.move(height - 1, 0)
                     for i in range(len(command)):
                         stdscr.addstr(' ')

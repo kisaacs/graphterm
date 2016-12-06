@@ -920,8 +920,8 @@ class TermDAG(object):
             print "     Adding", segment
             self.bst.print_tree()
 
-        before = self.bst.find_previous(segment)
-        after = self.bst.find_next(segment)
+        before = self.bst.find_previous(segment, self.debug)
+        after = self.bst.find_next(segment, self.debug)
         if (before, after) in self.crossings:
             x, y = self.crossings[(before, after)]
             self.pqueue.remove((x, y, before, after))
@@ -939,10 +939,10 @@ class TermDAG(object):
             print "CHECK: ", segment, before, bcross, after, across
 
     def right_endpoint(self, segment):
-        before = self.bst.find_previous(segment)
-        after = self.bst.find_next(segment)
+        before = self.bst.find_previous(segment, self.debug)
+        after = self.bst.find_next(segment, self.debug)
 
-        self.bst.delete(segment)
+        self.bst.delete(segment, self.debug)
 
         if self.debug:
             print "     Deleting", segment
@@ -962,8 +962,8 @@ class TermDAG(object):
             below = segment2
             above = segment1
 
-        before = self.bst.find_previous(below)
-        after = self.bst.find_next(above)
+        before = self.bst.find_previous(below, self.debug)
+        after = self.bst.find_next(above, self.debug)
         self.bst.swap(below, above)
 
         if self.debug:
@@ -1026,9 +1026,9 @@ class TermBST(object):
         else:
             return self.find_helper(root.right, segment)
 
-    def find_previous(self, segment):
+    def find_previous(self, segment, debug = False):
         node = self.find(segment)
-        if node is None:
+        if node is None and debug:
             print "ERROR, could not find", segment, " in find_previous"
             return None
         predecessor = node.left
@@ -1051,9 +1051,9 @@ class TermBST(object):
                     break
             return predecessor
 
-    def find_next(self, segment):
+    def find_next(self, segment, debug = False):
         node = self.find(segment)
-        if node is None:
+        if node is None and debug:
             print "ERROR, could not find", segment, " in find_next"
             return None
         successor = node.right
@@ -1076,11 +1076,12 @@ class TermBST(object):
                     break
             return successor
 
-    def delete(self, segment):
+    def delete(self, segment, debug = False):
         node = self.find(segment)
         if node is None:
-            print "ERROR, could not find", segment, "in delete"
-            self.print_tree()
+            if debug:
+                print "ERROR, could not find", segment, "in delete"
+                self.print_tree()
             return
         self.root = self.delete_helper(self.root, node)
 
@@ -1374,8 +1375,13 @@ def graph_interactive(spec, **kwargs):
 
     curses.wrapper(interactive_helper, tg, spec, **kwargs)
 
+    # Persist the depiction with stdout:
+    tg.print_grid()
+
 
 def interactive_helper(stdscr, graph, spec, **kwargs):
+    curses.start_color()
+    curses.use_default_colors()
     graph.print_interactive(stdscr)
 
 

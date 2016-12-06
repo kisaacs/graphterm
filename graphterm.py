@@ -540,18 +540,18 @@ class TermDAG(object):
                 else:
                     segment = TermSegment(last[0], last[1], coord[0], coord[1])
                     segments.add(segment)
+                    segment_lookup[(last[0], last[1], coord[0], coord[1])] = segment
                 link.segments.append(segment)
+                segment.links.append(link)
                 segment.start = coord_to_node[last]
 
                 if (coord[0], coord[1]) in coord_to_node:
                     placer = coord_to_node[(coord[0], coord[1])]
-                    placer._in_segments.append(segment)
                     segment.end = placer
                 else:
                     placer = TermNode("", None, False)
                     coord_to_node[(coord[0], coord[1])] = placer
                     coord_to_placer[(coord[0], coord[1])] = placer
-                    placer._in_segments.append(segment)
                     placer._x = coord[0]
                     placer._y = coord[1]
                     segment.end = placer
@@ -564,9 +564,10 @@ class TermDAG(object):
                 segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
                     self._nodes[link.sink]._y)
                 segments.add(segment)
+                segment_lookup[(last[0], last[1], coord[0], coord[1])] = segment
             link.segments.append(segment)
+            segment.links.append(segment)
             placer = coord_to_node[last]
-            self._nodes[link.sink]._in_segments.append(segment)
             segment.start = placer
             segment.end = self._nodes[link.sink]
 
@@ -702,6 +703,8 @@ class TermDAG(object):
 
         if self.debug:
             self.print_grid()
+            for segment in segments:
+                print segment, segment.gridlist
 
     def names_to_grid(self, highlight = ''):
         for row, names in self.row_names.items():
@@ -892,35 +895,26 @@ class TermDAG(object):
 
         node = self._nodes[name]
 
-        debug = 1
         for link in node._in_links:
             neighbor = self._nodes[link.source]
-
-            stdscr.addstr(debug, 0, 'Starting node: ' + neighbor.name)
-            debug += 1
             self.highlight_node(stdscr, neighbor.name, offset, 5)
-            debug = self.highlight_segments(stdscr, link.segments, offset, debug)
+            self.highlight_segments(stdscr, link.segments, offset)
 
         for link in node._out_links:
             neighbor = self._nodes[link.sink]
             self.highlight_node(stdscr, neighbor.name, offset, 5)
             self.highlight_segments(stdscr, link.segments, offset)
 
-    def highlight_segments(self, stdscr, segments, offset, debug):
+    def highlight_segments(self, stdscr, segments, offset):
         for segment in segments:
-            stdscr.addstr(debug, 0, 'Starting segment: ' + str(segment.gridlist))
-            debug += 1
             for coord in segment.gridlist:
                 x, y, char = coord
-                stdscr.addstr(debug, 0, str(coord))
-                debug += 1
                 if char == '':
                     continue
                 if self.grid[y][x] == ' ' or self.grid[y][x] == char:
                     stdscr.addch(y + offset, x, char, curses.color_pair(5))
                 elif char != self.grid[y][x]:
                     stdscr.addch(y + offset, x, 'X', curses.color_pair(5))
-        return debug
 
     def highlight_node(self, stdscr, name, offset, color):
         if name not in self._nodes:
@@ -1306,7 +1300,7 @@ class TermSegment(object):
         self.end = None
         self.octant = -1
         self.gridlist = []
-        self.paths = []
+        self.links = []
 
     def for_segment_sort(self):
         xlen = abs(self.x1 - self.x2)
@@ -1329,10 +1323,11 @@ class TermSegment(object):
         other = TermSegment(node._x, node._y, self.x2, self.y2)
         other.start = node
         other.end = self.end
-        node._in_segments.append(self)
         self.end = node
         self.x2 = node._x
         self.y2 = node._y
+        for link in self.links:
+            link.segments.append(other)
         return other
 
     def is_left_endpoint(self, x, y):
@@ -1432,9 +1427,6 @@ class TermNode(object):
         self.tulipNode = tulip
 
         self.real = real # Real node or segment connector?
-        self._in_segments = []
-        self.in_paths = dict()
-        self.out_paths = dict()
 
     def add_in_link(self, link):
         self._in_links.append(link)

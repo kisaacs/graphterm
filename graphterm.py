@@ -671,6 +671,12 @@ class TermDAG(object):
         # between the graph and the labels.
         self.gridsize[1] = row_max + 1
 
+        # Find the node order:
+        self.node_order = sorted(self._nodes.values(),
+            key = lambda node: node._row * 1e6 + node._col)
+        for i, node in enumerate(self.node_order):
+            node.order = i
+
         # Create the grid
         for i in range(self.gridsize[0]):
             self.grid.append([' ' for j in range(self.gridsize[1])])
@@ -859,22 +865,39 @@ class TermDAG(object):
                             self.highlight_neighbors(stdscr, selected, offset)
                             stdscr.move(height - 1, 0)
                             stdscr.refresh()
+                        elif (ch[1] == 'w' or ch[1] == 'W'):
+                            if selected:
+                                selected = self.node_order[(1 + self._nodes[selected].order)
+                                    % len(self.node_order)].name
+                            else:
+                                selected = self.node_order[0].name
+
+                            self.select_node(stdscr, selected, offset)
+                            stdscr.move(height - 1, 0)
+                            stdscr.refresh()
+                        elif (ch[1] == 'b' or ch[1] == 'B'):
+                            if selected:
+                                selected = self.node_order[(-1 + self._nodes[selected].order)
+                                    % len(self.node_order)].name
+                            else:
+                                selected = self.node_order[-1].name
+
+                            self.select_node(stdscr, selected, offset)
+                            stdscr.move(height - 1, 0)
+                            stdscr.refresh()
 
             else: # Command in progress
 
                 # Accept Command
                 if ch == curses.KEY_ENTER or ch == 10:
-                    # Clear existing highlights
-                    self.redraw_default(stdscr, offset)
-
-                    selected = self.highlight_node(stdscr, command[1:], offset, 7) # Cyan
-                    self.highlight_neighbors(stdscr, selected, offset)
                     stdscr.move(height - 1, 0)
                     for i in range(len(command)):
                         stdscr.addstr(' ')
+
+                    selected = self.select_node(stdscr, command[1:], offset)
                     stdscr.move(height - 1, 0)
-                    command = ''
                     stdscr.refresh()
+                    command = ''
 
                 # Handle Backspace
                 elif ch == curses.KEY_BACKSPACE:
@@ -890,6 +913,17 @@ class TermDAG(object):
                     command += ch
                     stdscr.addstr(ch)
                     stdscr.refresh()
+
+    def select_node(self, stdscr, name, offset):
+        # Clear existing highlights
+        self.redraw_default(stdscr, offset)
+
+        if name in self._nodes:
+            self.highlight_node(stdscr, name, offset, 7) # Cyan
+            self.highlight_neighbors(stdscr, name, offset)
+            return name
+
+        return ''
 
     def highlight_neighbors(self, stdscr, name, offset):
         """We assume that the node in question is already highlighted."""

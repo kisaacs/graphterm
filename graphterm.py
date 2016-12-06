@@ -480,6 +480,8 @@ class TermDAG(object):
         self.DOWN_LEFT = 2
         self.LEFT = 3
 
+        self.debug = False
+
     def add_node(self, name):
         tulipNode = self._tulip.addNode()
         node = TermNode(name, tulipNode)
@@ -515,6 +517,9 @@ class TermDAG(object):
         segment_lookup = dict()
         coord_to_node = dict()
         coord_to_placer = dict()
+
+        # Convert Tulip layout to something we can manipulate for both nodes
+        # and links.
         for node in self._nodes.values():
             coord = viewLayout.getNodeValue(node.tulipNode)
             node._x = coord[0]
@@ -525,22 +530,17 @@ class TermDAG(object):
             coord_to_node[(coord[0], coord[1])] = node
 
         for link in self._links:
-            path = TermPath(self._nodes[link.source], self._nodes[link.sink])
             link._coords = viewLayout.getEdgeValue(link.tulipLink)
             last = (self._nodes[link.source]._x, self._nodes[link.source]._y)
-            last_node = True
             for coord in link._coords:
                 xset.add(coord[0])
                 yset.add(coord[1])
                 if (last[0], last[1], coord[0], coord[1]) in segment_lookup:
                     segment = segment_lookup[(last[0], last[1], coord[0], coord[1])]
                 else:
-                    segment = TermSegment(last[0], last[1], coord[0],
-                        coord[1], last_node, False)
+                    segment = TermSegment(last[0], last[1], coord[0], coord[1])
                     segments.add(segment)
-                path.segments.append(segment)
-                self._nodes[link.source].in_paths[self._nodes[link.sink]] = path
-                self._nodes[link.sink].out_paths[self._nodes[link.source]] = path
+                link.segments.append(segment)
                 segment.start = coord_to_node[last]
 
                 if (coord[0], coord[1]) in coord_to_node:
@@ -556,26 +556,26 @@ class TermDAG(object):
                     placer._y = coord[1]
                     segment.end = placer
 
-                #coord_to_node[last]._out_segments.append(segment)
                 last = (coord[0], coord[1])
-                last_node = False
 
             if (last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y) in segment_lookup:
                 segment = segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)]
             else:
                 segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
-                    self._nodes[link.sink]._y, last_node, False)
+                    self._nodes[link.sink]._y)
                 segments.add(segment)
             placer = coord_to_node[last]
-            #placer._out_segments.append(segment)
             self._nodes[link.sink]._in_segments.append(segment)
             segment.start = placer
             segment.end = self._nodes[link.sink]
 
+        # Find crossings and create new segments based on them
         self.find_crossings(segments)
-        print "CROSSINGS ARE: "
+        if self.debug:
+            print "CROSSINGS ARE: "
         for k, v in self.crossings.items():
-            print k, v
+            if self.debug:
+                print k, v
             segment1, segment2 = k
             x, y = v
             placer = TermNode('', None, False)
@@ -590,7 +590,7 @@ class TermDAG(object):
             xset.add(x)
             yset.add(y)
 
-
+        # Based on the tulip layout, do the following:
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
         ysort.reverse()
@@ -606,14 +606,12 @@ class TermDAG(object):
                 y += 1
             y += 1
 
-
-        self.write_tulip_positions();
-        print "xset", xsort
-        print "yset", ysort
-        print self.gridsize
-        tlp.saveGraph(self._tulip, 'test.tlp')
-        #for segment in segments:
-        #    print segment
+        if self.debug:
+            self.write_tulip_positions();
+            print "xset", xsort
+            print "yset", ysort
+            print self.gridsize
+            tlp.saveGraph(self._tulip, 'test.tlp')
 
         row_lookup = dict()
         col_lookup = dict()
@@ -636,18 +634,21 @@ class TermDAG(object):
                 if node._col > self.row_last[node._row]:
                     self.row_last[node._row] = node._col
 
-        # Keep them sorted
+        # Sort the labels by left-right position
         for row, nodes in row_nodes.items():
             row_nodes[row] = sorted(nodes, key = lambda node: node._col)
 
+        # Figure out the amount of space needed based on the labels
         row_max = self.gridsize[1]
         self.row_names = dict()
         names = ''
         pos = 0
         for row, nodes in row_nodes.items():
-            first = nodes[-1].name
+            first = nodes[-1].name # Draw the last next to its node
             nodes[-1].label_pos = pos
             pos += len(first)
+
+            # Draw the rest in a bracketed list]
             rest = ''
             if len(nodes) > 1:
                 for node in nodes[:-1]:
@@ -664,43 +665,42 @@ class TermDAG(object):
             row_max = max(row_max, self.gridsize[1] + 1 + len(names))
             self.row_names[row] = names
 
-        # Max number of columns needed
+        # Max number of columns needed -- we add one for a space
+        # between the graph and the labels.
         self.gridsize[1] = row_max + 1
 
+        # Create the grid
         for i in range(self.gridsize[0]):
             self.grid.append([' ' for j in range(self.gridsize[1])])
             self.gridedge.append(0)
 
+        # Add the nodes in the grid
         for coord, node in coord_to_node.items():
             node._row = segment_pos[coord[1]]
             node._col = column_multiplier * col_lookup[coord[0]]
             if node.real:
-                print 'Drawing node at', node._row, node._col
                 self.grid[node._row][node._col] = 'o'
-                self.print_grid()
-                if node._row not in row_nodes:
-                    row_nodes[node._row] = []
-                row_nodes[node._row].append(node)
-            #elif node.has_vertical():
-            #    self.grid[node._row][node._col] = '|'
-            #elif node._in_segments > 0:
-            #    self.grid[node._row][node._col] = '.'
-            #else:
-            #    self.grid[node._row][node._col] = '.'
 
-        # Sort segments on drawing difficulty
+                if self.debug:
+                    print 'Drawing node at', node._row, node._col
+                    self.print_grid()
+
+
+        # Sort segments on drawing difficulty -- this is useful for 
+        # debugging collisions. It will eventually be used to help
+        # re-route collisions.
         segments = sorted(segments, key = lambda x: x.for_segment_sort())
 
+        # Add segments to the grid
         for segment in segments:
-            #print 'Doing node', segment.start._col, ',', segment.start._row, 'to', segment.end._col, ',', segment.end._row
             segment.gridlist =  self.draw_line(segment)
-            #segment.gridlist =  self.bresenham(segment)
             self.row_last = self.set_to_grid(segment, self.row_last)
-            #self.print_grid()
 
+        # Add labels to the grid
         self.names_to_grid()
 
-        self.print_grid(row_nodes, self.row_last)
+        if self.debug:
+            self.print_grid()
 
     def names_to_grid(self, highlight = ''):
         for row, names in self.row_names.items():
@@ -714,12 +714,14 @@ class TermDAG(object):
         end = segment.end
         last_x = start._col
         last_y = start._row
-        print '   Drawing segment [', segment.start._col, ',', segment.start._row, '] to [', \
-            segment.end._col, ',', segment.end._row, ']', segment.gridlist, segment
+        if self.debug:
+            print '   Drawing segment [', segment.start._col, ',', \
+                segment.start._row, '] to [', segment.end._col, ',', \
+                segment.end._row, ']', segment.gridlist, segment
         for coord in segment.gridlist:
             x, y, char = coord
-            #char = self.link_char(last_x, last_y, x, y, last)
-            print 'Drawing', char, 'at', x, y
+            if self.debug:
+                print 'Drawing', char, 'at', x, y
             if char == '':
                 continue
             if self.grid[y][x] == ' ':
@@ -731,7 +733,9 @@ class TermDAG(object):
                 row_last[y] = x
             last_x = x
             last_y = y
-            self.print_grid()
+
+            if self.debug:
+                self.print_grid()
         return row_last
 
     def draw_line(self, segment):
@@ -739,28 +743,23 @@ class TermDAG(object):
         y1 = segment.start._row
         x2 = segment.end._col
         y2 = segment.end._row
-        print 'Drawing', x1, y1, x2, y2
+        if self.debug:
+            print 'Drawing', x1, y1, x2, y2
 
         if segment.start.real:
-            print 'Advancing due to segment start...'
+            if self.debug:
+                print 'Advancing due to segment start...'
             y1 += 1
 
         if x2 > x1:
             xdir = 1
         else:
             xdir = -1
-        print 'xdir is', xdir
 
         ydist = y2 - y1
         xdist = abs(x2 - x1)
-        print 'xydist are', xdist, ydist
 
         moves = []
-        # Vertical case
-        #if x1 == x2:
-        #    for y in range(y1, y2):
-        #        moves.append((x1, y))
-        #    return moves
 
         currentx = x1
         currenty = y1
@@ -769,7 +768,8 @@ class TermDAG(object):
             # xdist - 1 ... except in the pure vertical case where 
             # xdist is already zero. Kind of strange isn't it?
             for y in range(y1, y2 - max(0, xdist - 1)):
-                print 'moving vertical with', x1, y
+                if self.debug:
+                    print 'moving vertical with', x1, y
                 moves.append((x1, y, '|'))
                 currenty = y
         else:
@@ -777,13 +777,15 @@ class TermDAG(object):
             # Starting from currentx, move until just enough 
             # room to go the y direction (minus 1... we don't go all the way)
             for x in range(x1 + xdir, x2 - xdir * (ydist), xdir):
-                print 'moving horizontal with', x, (y1 - 1)
+                if self.debug:
+                    print 'moving horizontal with', x, (y1 - 1)
                 moves.append((x, y1 - 1, '_'))
                 currentx = x
 
         for y in range(currenty + 1, y2):
             currentx += xdir
-            print 'moving diag to', currentx, y
+            if self.debug:
+                print 'moving diag to', currentx, y
             if xdir == 1:
                 moves.append((currentx, y, '\\'))
             else:
@@ -791,95 +793,7 @@ class TermDAG(object):
 
         return moves
 
-    # We need to see where we were to see where we go next.
-    # If both x & y change: use a slash, back if pos, forward if neg
-    # If only x changes: use an underscore
-    # If only y changes: use a pipe
-    def link_char(self, x1, y1, x2, y2, last = False):
-        #if x1 == x2 and y1 == y2:
-        #    return ''
-        if x1 == x2:
-            return '|'
-        elif y1 == y2 and not last:
-            return '_'
-        elif x1 < x2:
-            return '\\'
-        else:
-            return '/'
-
-    def bresenham(self, segment):
-        x1 = segment.start._col
-        y1 = segment.start._row
-        x2 = segment.end._col
-        y2 = segment.end._row
-
-        # We know we are always moving vaguely down, so we only have
-        # four of the Bresenham cases:
-        # abs(delta x) > delta y AND delta x > 0
-        # abs(delta x) > delta y AND delta x < 0
-        # abs(delta x) < delta y AND delta x > 0
-        # abs(delta x) < delta y AND delta x < 0
-        segment.octant = self.get_octant(x2 - x1, y2 - y1)
-        start = self.to_octant(segment.octant, x1, y1)
-        stop = self.to_octant(segment.octant, x2, y2)
-        return self.bresenham_octant(start[0], start[1], stop[0], stop[1], segment.octant)
-
-    def get_octant(self, dx, dy):
-        if abs(dx) > dy:
-            if dx > 0:
-                return self.RIGHT
-            else:
-                return self.LEFT
-        else:
-            if dx > 0:
-                return self.DOWN_RIGHT
-            else:
-                return self.DOWN_LEFT
-
-    def bresenham_octant(self, x1, y1, x2, y2, octant):
-        dx = x2 - x1
-        dy = y2 - y1
-        D = 2 * dy - dx
-        y = y1
-        if x2 > x1:
-            range_dir = 1
-        else:
-            range_dir = -1
-
-        moves = []
-        for x in range(x1, x2, range_dir):
-            moves.append(self.from_octant(octant, x,y))
-            if D >= 0:
-                y += 1
-                D -= dx
-            D += dy
-        return moves
-
-    def to_octant(self, octant, x, y):
-        if octant == self.RIGHT:
-            return (x,y)
-        elif octant == self.LEFT:
-            return (-x, y)
-        elif octant == self.DOWN_RIGHT:
-            return (y, x)
-        elif octant == self.DOWN_LEFT:
-            return (y, -x)
-
-        print 'ERROR NO OCTANT'
-
-    def from_octant(self, octant, x, y):
-        if octant == self.RIGHT:
-            return (x,y)
-        elif octant == self.LEFT:
-            return (-x, y)
-        elif octant == self.DOWN_RIGHT:
-            return (y, x)
-        elif octant == self.DOWN_LEFT:
-            return (-y, x)
-
-        print 'ERROR NO OCTANT'
-
-    def print_grid(self, row_nodes = None, row_last = None):
+    def print_grid(self):
         for row in self.grid:
             print ''.join(row)
 
@@ -907,7 +821,6 @@ class TermDAG(object):
         for link in self._links:
             print link.source, link.sink, link._coords
 
-
     def to_dot_object(self):
         dot = gv.digraph('term')
 
@@ -924,7 +837,8 @@ class TermDAG(object):
 
         for node in self._nodes.values():
             handle = gv.findnode(dot, node.name)
-            print '***', node.name, gv.getv(handle, 'rank'), gv.getv(handle, 'pos')
+            if self.debug:
+                print node.name, gv.getv(handle, 'rank'), gv.getv(handle, 'pos')
 
             attr = gv.firstattr(handle)
             while (attr):
@@ -942,7 +856,6 @@ class TermDAG(object):
         yset = set()
         for line in plaintext.split('\n'):
             linevals = line.split(' ')
-            #print linevals
             if linevals[0] == 'node':
                 node = self._nodes[linevals[1]]
                 node._x = linevals[2]
@@ -971,7 +884,10 @@ class TermDAG(object):
             node._col = x_to_col[node._x]
             print node.name, node._row, node._col
 
+
     def find_crossings(self, segments):
+        """Bentley-Ottmann line-crossing detection."""
+
         self.bst = TermBST() # BST of segments crossing L
         self.pqueue = [] # Priority Queue of potential future events
         endpoints = set() # True endpoints -- we don't count crossings here
@@ -986,7 +902,10 @@ class TermDAG(object):
 
         while self.pqueue:
             x1, y1, segment1, segment2 = heapq.heappop(self.pqueue)
-            #print "     Popping", x1, y1, segment1, segment2
+
+            if self.debug:
+                print "     Popping", x1, y1, segment1, segment2
+
             if segment1.is_left_endpoint(x1, y1):
                 self.left_endpoint(segment1)
             elif segment1.is_right_endpoint(x1, y1):
@@ -996,33 +915,41 @@ class TermDAG(object):
 
     def left_endpoint(self, segment):
         self.bst.insert(segment)
-        #print "     Adding", segment
-        #self.bst.print_tree()
+
+        if self.debug:
+            print "     Adding", segment
+            self.bst.print_tree()
+
         before = self.bst.find_previous(segment)
         after = self.bst.find_next(segment)
         if (before, after) in self.crossings:
             x, y = self.crossings[(before, after)]
             self.pqueue.remove((x, y, before, after))
             heapq.heapify(self.pqueue)
-        bcross, x, y = segment.intersect(before)
+        bcross, x, y = segment.intersect(before, self.debug)
         if bcross:
             heapq.heappush(self.pqueue, (x, y, before, segment))
             self.crossings[(before, segment)] = (x, y)
-        across, x, y = segment.intersect(after)
+        across, x, y = segment.intersect(after, self.debug)
         if across:
             heapq.heappush(self.pqueue, (x, y, segment, after))
             self.crossings[(segment, after)] = (x, y)
-        #if before or after:
-        #    print "CHECK: ", segment, before, bcross, after, across
+
+        if self.debug and (before or after):
+            print "CHECK: ", segment, before, bcross, after, across
 
     def right_endpoint(self, segment):
         before = self.bst.find_previous(segment)
         after = self.bst.find_next(segment)
-        #print "     Deleting", segment
+
         self.bst.delete(segment)
-        #self.bst.print_tree()
+
+        if self.debug:
+            print "     Deleting", segment
+            self.bst.print_tree()
+
         if before:
-            bacross, x, y = before.intersect(after)
+            bacross, x, y = before.intersect(after, self.debug)
             if bacross:
                 heapq.heappush(self.pqueue, (x, y, before, after))
                 self.crossings[(before, after)] = (x, y)
@@ -1038,8 +965,10 @@ class TermDAG(object):
         before = self.bst.find_previous(below)
         after = self.bst.find_next(above)
         self.bst.swap(below, above)
-        #print "     Swapping", below, above
-        #self.bst.print_tree()
+
+        if self.debug:
+            print "     Swapping", below, above
+            self.bst.print_tree()
 
         if (before, below) in self.crossings:
             x, y = self.crossings[(before, below)]
@@ -1053,14 +982,15 @@ class TermDAG(object):
                 heapq.heapify(self.pqueue)
 
         if before:
-            cross1, x, y = before.intersect(above)
+            cross1, x, y = before.intersect(above, self.debug)
             if cross1:
                 heapq.heappush(self.pqueue, (x, y, before, above))
                 self.crossings[(before, above)] = (x, y)
-        cross2, x, y = below.intersect(after)
+        cross2, x, y = below.intersect(after, self.debug)
         if cross2:
             heapq.heappush(self.pqueue, (x, y, below, after))
             self.crossings[(below, after)] = (x, y)
+
 
 class TermBST(object):
 
@@ -1092,10 +1022,8 @@ class TermBST(object):
         if root is None or root.segment == segment:
             return root
         elif root.segment > segment:
-            #print "   Left on", segment, root.segment
             return self.find_helper(root.left, segment)
         else:
-            #print "   Right on", segment, root.segment
             return self.find_helper(root.right, segment)
 
     def find_previous(self, segment):
@@ -1183,11 +1111,10 @@ class TermBST(object):
             return root
 
     def print_tree(self):
-        #print self.tree_to_list()
-        print '---'
+        print '--- Tree ---'
         if self.root:
             self.print_tree_helper(self.root, '')
-        print '---'
+        print '------------'
 
     def print_tree_helper(self, root, indent):
         if root.left:
@@ -1209,6 +1136,7 @@ class TermBST(object):
             lst = self.tree_to_list_helper(root.right, lst)
         return lst
 
+
 class TermBSTNode(object):
 
     def __init__(self, segment):
@@ -1217,17 +1145,16 @@ class TermBSTNode(object):
         self.right = None
 
 class TermSegment(object):
+    """A straight-line portion of a drawn poly-line in the graph rendering."""
 
-    def __init__(self, x1, y1, x2, y2, e1 = None, e2 = None):
+    def __init__(self, x1, y1, x2, y2):
         #print "Initting", x1, y1, x2, y2
-        # The e1 and e2 are whether the two endpoints exist as real nodes
         self.x1 = x1
         self.x2 = x2
         self.y1 = y1
         self.y2 = y2
-        self.e1 = e1
-        self.e2 = e2
 
+        # Alternative representations for crossing detection
         self.p1 = (x1, y1)
         self.p2 = (x2, y2)
         self.pdiff = (x2 - x1, y2 - y1)
@@ -1244,7 +1171,6 @@ class TermSegment(object):
         else:
             self.left = (x2, y2)
             self.right = (x1, y1)
-        #print "  with L/R:", self.left, self.right
 
         self.start = None
         self.end = None
@@ -1259,20 +1185,24 @@ class TermSegment(object):
         seg = 0
         # Pure vertical should sort smallest
         if xlen > 0:
-            seg += 1000
+            seg += 1e9
+
         # After that, number of characters:
         seg += xlen + ylen
         return seg
 
     def split(self, node):
-        other = TermSegment(node._x, node._y, self.x2, self.y2, False, self.e2)
+        """Split this segment into two at node. Return the next segment.
+
+           Note the new segment is always the second part (closer to the sink).
+        """
+        other = TermSegment(node._x, node._y, self.x2, self.y2)
         other.start = node
         other.end = self.end
         node._in_segments.append(self)
         self.end = node
         self.x2 = node._x
         self.y2 = node._y
-        self.e2 = False
         return other
 
     def is_left_endpoint(self, x, y):
@@ -1285,30 +1215,38 @@ class TermSegment(object):
             return True
         return False
 
-
-    def intersect(self, other):
+    def intersect(self, other, debug = False):
         if other is None:
             return (False, 0, 0)
 
         # See: stackoverflow.com/questions/563198
         diffcross = self.cross2D(self.pdiff, other.pdiff)
-        initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), self.pdiff)
-        #print " - Intersecting", self, other, self.pdiff, other.pdiff, diffcross, other.x1, self.x1, other.y1, self.y1, initcross
+        initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1),
+            self.pdiff)
+
+        if debug:
+            print " - Intersecting", self, other, self.pdiff, other.pdiff, \
+                diffcross, other.x1, self.x1, other.y1, self.y1, initcross
 
         if diffcross == 0 and initcross == 0: # Co-linear
             # Impossible for our purposes -- we do not count intersection at
             # end points
             return (False, 0, 0)
+
         elif diffcross == 0: # parallel
             return (False, 0, 0)
+
         else: # intersection!
             offset = initcross / diffcross
             offset2 = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), other.pdiff) / diffcross
-            #print " - offsets are", offset, offset2
+            if debug:
+                print " - offsets are", offset, offset2
+
             if offset > 0 and offset < 1 and offset2 > 0 and offset2 < 1:
                 xi = other.x1 + offset * other.pdiff[0]
                 yi = other.y1 + offset * other.pdiff[1]
-                #print " - points are:", xi, yi
+                if debug:
+                    print " - points are:", xi, yi
                 return (True, xi, yi)
             return (False, 0, 0)
 
@@ -1321,11 +1259,10 @@ class TermSegment(object):
         return (self.x1 == other.x1
             and self.x2 == other.x2
             and self.y1 == other.y1
-            and self.y2 == other.y2
-            and self.e1 == other.e1
-            and self.e2 == other.e2)
+            and self.y2 == other.y2)
 
-    # For the line-sweep algorithm
+    # For the line-sweep algorithm, we have some consistent ordering
+    # as we will have a lot of collisions on just x alone.
     def __lt__(self, other):
         if self.x1 == other.x1:
             if self.y1 == other.y1:
@@ -1344,18 +1281,12 @@ class TermSegment(object):
         return False
 
     def __repr__(self):
-        return "TermSegment(%s, %s, %s, %s, %s, %s)" % (self.x1, self.y1, self.x2, self.y2, self.e1, self.e2)
+        return "TermSegment(%s, %s, %s, %s)" % (self.x1, self.y1,
+            self.x2, self.y2)
 
     def __hash__(self):
         return hash(self.__repr__())
 
-class TermPath(object):
-
-    def __init__(self, to_node, from_node):
-        self.source = from_node
-        self.sink = to_node
-
-        self.segments = []
 
 class TermNode(object):
 
@@ -1363,14 +1294,14 @@ class TermNode(object):
         self.name = node_id
         self._in_links = list()
         self._out_links = list()
-        self._x = -1
-        self._y = -1
-        self._col = 0
-        self._row = 0
-        self.label_pos = -1
+        self._x = -1  # Real
+        self._y = -1  # Real
+        self._col = 0 # Int
+        self._row = 0 # Int
+        self.label_pos = -1 # Int
         self.tulipNode = tulip
 
-        self.real = real
+        self.real = real # Real node or segment connector?
         self._in_segments = []
         self.in_paths = dict()
         self.out_paths = dict()
@@ -1381,11 +1312,6 @@ class TermNode(object):
     def add_out_link(self, link):
         self._out_links.append(link)
 
-    def has_vertical(self):
-        for segment in self._in_segments:
-            if segment.x1 == self._x:
-                return True
-        return False
 
 class TermLink(object):
 
@@ -1395,6 +1321,8 @@ class TermLink(object):
         self.sink = sink
         self.tulipLink = tlp
         self._coords = None
+
+        self.segments = []
 
 
 def spec_to_graph(spec):
@@ -1415,77 +1343,6 @@ def spec_to_graph(spec):
             tg.add_link(name, dep.name)
 
     return tg
-
-
-
-
-class InteractiveAsciiGraph(object):
-
-    def __init__(self, dag):
-        # These can be set after initialization or after a call to
-        # graph() to change behavior.
-        self.node_character = '*'
-        self.debug = False
-        self.indent = 0
-
-        # These are colors in the order they'll be used for edges.
-        # See llnl.util.tty.color for details on color characters.
-        self.colors = 'rgbmcyRGBMCY'
-
-        # Internal vars are used in the graph() function and are
-        # properly initialized there.
-        self._name_to_color = None    # Node name to color
-        self._state = None            # Screen state
-        self._row_lengths = None      # Array of row lengths
-        self._frontier = None         # frontier
-        self._nodes = None            # dict from name -> node
-        self._prev_state = None       # State of previous line
-        self._prev_index = None       # Index of expansion point of prev line
-        self._row = 0                 # Index of current row
-        self._col = 0
-        self._height = 0
-        self._width = 0
-
-
-
-    def set_screen_size(self, stdscr):
-        h, w = stdscr.getmaxyx()
-        self._height = h - 1
-        self._width = w - 1
-        self._state = [ [' ' for x in range(self._width) ] for y in range(self._height) ]
-        self._row_length = [ 0 for y in range(self._height) ]
-        self._row = 0
-        self._col = 0
-
-    def _set_state(self, state, index, label=None):
-        if state not in states:
-            raise ValueError("Invalid graph state!")
-        self._prev_state = state
-        self._prev_index = index
-
-        #if self.debug:
-        #    self._out.write(" " * 20)
-        #    self._out.write("%-20s" % (
-        #        str(self._prev_state) if self._prev_state else ''))
-        #    self._out.write("%-20s" % (str(label) if label else ''))
-        #    self._out.write("%s" % self._frontier)
-
-    def interactive(self, stdscr):
-        for h in range(self._height):
-            for w in range(self._width):
-                if self._state[h][w] != '':
-                    stdscr.addch(h, w, self._state[h][w])
-                else:
-                    continue
-
-        stdscr.refresh()
-
-        while True:
-            ch = stdscr.getch()
-            if ch == curses.KEY_MOUSE:
-                pass
-            elif ch == ord('q') or ch == ord('Q'):
-                return
 
 def graph_ascii(spec, **kwargs):
     node_character = kwargs.get('node', 'o')
@@ -1509,18 +1366,18 @@ def graph_nodecount(spec, **kwargs):
 def graph_interactive(spec, **kwargs):
     tg = spec_to_graph(spec)
     tg.layout_hierarchical()
-    #dot = tg.to_dot_object()
-    #gv.layout(dot, 'dot')
-    #tg.get_dot_positions(dot)
-    #gv.render(dot, 'pdf', 'term-dag.pdf')
+    if kwargs.get('dotpdf', False):
+        dot = tg.to_dot_object()
+        gv.layout(dot, 'dot')
+        tg.get_dot_positions(dot)
+        gv.render(dot, 'pdf', 'term-dag.pdf')
 
-
-    #graph = InteractiveAsciiGraph()
     curses.wrapper(interactive_helper, tg, spec, **kwargs)
-    #graph.debug_state()
+
 
 def interactive_helper(stdscr, graph, spec, **kwargs):
     graph.print_interactive(stdscr)
+
 
 def graph_dot(*specs, **kwargs):
     """Generate a graph in dot format of all provided specs.

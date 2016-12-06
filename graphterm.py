@@ -803,9 +803,37 @@ class TermDAG(object):
 
         return moves
 
-    def print_grid(self):
-        for row in self.grid:
-            print ''.join(row)
+    def print_grid(self, with_colors = False):
+        if not with_colors:
+            for row in self.grid:
+                print ''.join(row)
+            return
+
+        for i in range(self.gridsize[0]):
+            print self.print_color_row(i)
+
+
+    def print_color_row(self, i):
+        text = self.grid[i]
+        colors = self.grid_colors[i]
+
+        color = -1
+        string = ''
+        for i, ch in enumerate(text):
+            if colors[i] != color:
+                color = colors[i]
+                string += '\x1b[' + str(self.to_ansi_foreground(color)) + 'm'
+            string += ch
+
+        string += '\x1b[0m'
+        return string
+
+    def to_ansi_foreground(self, color):
+        # Note ANSI offset for foreground color is 30 + ANSI lookup.
+        # However, we are off by 1 due to curses, hence the minus one.
+        if color != 0:
+            color += 30 - 1
+        return color
 
     def color_string(self, tup):
         string = '(' + str(tup[0])
@@ -819,21 +847,21 @@ class TermDAG(object):
         offset = height - self.gridsize[0] - 1
 
         stdscr.move(0, 0)
+        self.color_dict = dict()
         for i in range(0, curses.COLORS):
             fg, bg = curses.pair_content(i + 1)
+            self.color_dict[i + 1] = fg
             if i % 8 == 0:
                 stdscr.move(i / 8, 0)
             stdscr.addstr(self.color_string(curses.color_content(fg)), curses.color_pair(i + 1))
 
+        # Save state
+        self.grid_colors = []
+        for row in range(self.gridsize[0]):
+            self.grid_colors.append([0 for x in range(self.gridsize[1])])
 
         # Draw initial grid and initialize colors to default
-        for h in range(self.gridsize[0]):
-            for w in range(self.gridsize[1]):
-                if self.grid[h][w] != '':
-                    stdscr.addch(h + offset, w, self.grid[h][w])
-                else:
-                    continue
-
+        self.redraw_default(stdscr, offset)
         stdscr.refresh()
 
         stdscr.move(height - 1, 0)
@@ -946,6 +974,7 @@ class TermDAG(object):
                 x, y, char = coord
                 if char == '':
                     continue
+                self.grid_colors[y][x] = 5
                 if self.grid[y][x] == ' ' or self.grid[y][x] == char:
                     stdscr.addch(y + offset, x, char, curses.color_pair(5))
                 elif char != self.grid[y][x]:
@@ -959,6 +988,7 @@ class TermDAG(object):
         stdscr.addch(node._row + offset, node._col, 'o', curses.color_pair(color))
         label_offset = self.row_last[node._row] + 2
         for i, ch in enumerate(node.name):
+            self.grid_colors[node._row][label_offset + node.label_pos + i] = color
             stdscr.addch(node._row + offset, label_offset + node.label_pos + i,
                 ch, curses.color_pair(color))
 
@@ -967,6 +997,7 @@ class TermDAG(object):
     def redraw_default(self, stdscr, offset):
         for h in range(self.gridsize[0]):
             for w in range(self.gridsize[1]):
+                self.grid_colors[h][w] = 0
                 if self.grid[h][w] != '':
                     stdscr.addch(h + offset, w, self.grid[h][w])
                 else:
@@ -1532,7 +1563,7 @@ def graph_interactive(spec, **kwargs):
     curses.wrapper(interactive_helper, tg, spec, **kwargs)
 
     # Persist the depiction with stdout:
-    tg.print_grid()
+    tg.print_grid(True)
 
 
 def interactive_helper(stdscr, graph, spec, **kwargs):

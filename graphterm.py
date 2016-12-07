@@ -16,6 +16,7 @@ class TermDAG(object):
         self.gridsize = [0,0]
         self.gridedge = [] # the last char per row
         self.grid = []
+        self.grid_colors = []
 
         self.RIGHT = 0
         self.DOWN_RIGHT = 1
@@ -358,10 +359,10 @@ class TermDAG(object):
         return moves
 
     def print_grid(self, with_colors = False):
-        if not self.layout:
+        if not self.layout and not self.debug:
             self.layout_hierarchical()
 
-        if not with_colors:
+        if not with_colors or not self.grid_colors:
             for row in self.grid:
                 print ''.join(row)
             return
@@ -633,36 +634,37 @@ class TermDAG(object):
             node._col = x_to_col[node._x]
             print node.name, node._row, node._col
 
-
     def find_crossings(self, segments):
-        """Bentley-Ottmann line-crossing detection."""
+        """Bentley-Ottmann line-crossing detection.
 
+           We sweep from bottom to top because the Tulip y's are
+           negative values. We think of this as just having the DAG
+           upside down and sweeping from top to bottom.
+        """
         self.bst = TermBST() # BST of segments crossing L
         self.pqueue = [] # Priority Queue of potential future events
-        endpoints = set() # True endpoints -- we don't count crossings here
         self.crossings = dict() # Will be (segment1, segment2) = (x, y)
 
         # Put all segments in queue
         for segment in segments:
-            heapq.heappush(self.pqueue, (segment.x1, segment.y1, segment, segment))
-            heapq.heappush(self.pqueue, (segment.x2, segment.y2, segment, segment))
-            endpoints.union((segment.x1,segment.y1))
-            endpoints.union((segment.x2,segment.y2))
+            heapq.heappush(self.pqueue, (segment.y1, segment.x1, segment, segment))
+            heapq.heappush(self.pqueue, (segment.y2, segment.x2, segment, segment))
 
         while self.pqueue:
-            x1, y1, segment1, segment2 = heapq.heappop(self.pqueue)
+            y1, x1, segment1, segment2 = heapq.heappop(self.pqueue)
 
             if self.debug:
-                print "     Popping", x1, y1, segment1, segment2
+                print "\n     Popping", x1, y1, segment1, segment2
 
-            if segment1.is_left_endpoint(x1, y1):
-                self.left_endpoint(segment1)
-            elif segment1.is_right_endpoint(x1, y1):
-                self.right_endpoint(segment1)
+            if segment1.is_top_endpoint(x1, y1):
+                self.top_endpoint(segment1)
+            elif segment1.is_bottom_endpoint(x1, y1):
+                self.bottom_endpoint(segment1)
             else:
                 self.crossing(x1, y1, segment1, segment2)
 
-    def left_endpoint(self, segment):
+
+    def top_endpoint(self, segment):
         self.bst.insert(segment)
 
         if self.debug:
@@ -673,21 +675,25 @@ class TermDAG(object):
         after = self.bst.find_next(segment, self.debug)
         if (before, after) in self.crossings:
             x, y = self.crossings[(before, after)]
-            self.pqueue.remove((x, y, before, after))
+            self.pqueue.remove((y, x, before, after))
             heapq.heapify(self.pqueue)
         bcross, x, y = segment.intersect(before, self.debug)
         if bcross:
-            heapq.heappush(self.pqueue, (x, y, before, segment))
+            heapq.heappush(self.pqueue, (y, x, before, segment))
             self.crossings[(before, segment)] = (x, y)
         across, x, y = segment.intersect(after, self.debug)
         if across:
-            heapq.heappush(self.pqueue, (x, y, segment, after))
+            heapq.heappush(self.pqueue, (y, x, segment, after))
             self.crossings[(segment, after)] = (x, y)
 
         if self.debug and (before or after):
-            print "CHECK: ", segment, before, bcross, after, across
+            print "CHECK: ", bcross, across, segment, before, after
 
-    def right_endpoint(self, segment):
+
+    def bottom_endpoint(self, segment):
+        if self.debug:
+            print "     Bottom Check", segment
+            self.bst.print_tree()
         before = self.bst.find_previous(segment, self.debug)
         after = self.bst.find_next(segment, self.debug)
 
@@ -700,45 +706,55 @@ class TermDAG(object):
         if before:
             bacross, x, y = before.intersect(after, self.debug)
             if bacross:
-                heapq.heappush(self.pqueue, (x, y, before, after))
+                heapq.heappush(self.pqueue, (y, x, before, after))
                 self.crossings[(before, after)] = (x, y)
 
-    def crossing(self, x, y, segment1, segment2):
-        if segment1.y1 < y:
-            below = segment1
-            above = segment2
-        else:
-            below = segment2
-            above = segment1
 
-        before = self.bst.find_previous(below, self.debug)
-        after = self.bst.find_next(above, self.debug)
-        self.bst.swap(below, above)
-
+    def crossing(self, c1, c2, segment1, segment2):
         if self.debug:
-            print "     Swapping", below, above
+            print "     Crossing check", c1, c2, segment1, segment2
             self.bst.print_tree()
 
-        if (before, below) in self.crossings:
-            x, y = self.crossings[(before, below)]
-            if (x, y, before, below) in self.pqueue:
-                self.pqueue.remove((x, y, before, below))
+        if segment1.y1 < c2:
+            first = segment1
+            second = segment2
+        else:
+            first = segment2
+            second = segment1
+
+        before = self.bst.find_previous(first, self.debug)
+        after = self.bst.find_next(second, self.debug)
+
+        # Now do the swap
+        self.bst.swap(first, second, c2, c1)
+
+        if self.debug:
+            print "     Swapping", first, second
+            self.bst.print_tree()
+
+        # Remove crossings between first/before and second/after
+        # from the priority queue
+        if (after, second) in self.crossings:
+            x, y = self.crossings[(after, second)]
+            if (y, x, after, second) in self.pqueue:
+                self.pqueue.remove((y, x, after, second))
                 heapq.heapify(self.pqueue)
-        if (above, after) in self.crossings:
-            x, y = self.crossings[(above, after)]
-            if (x, y, above, after) in self.pqueue:
-                self.pqueue.remove((x, y, above, after))
+        if (first, before) in self.crossings:
+            x, y = self.crossings[(first, before)]
+            if (y, x, first, before) in self.pqueue:
+                self.pqueue.remove((y, x, first, before))
                 heapq.heapify(self.pqueue)
 
+        # Add possible new crossings
         if before:
-            cross1, x, y = before.intersect(above, self.debug)
+            cross1, x, y = before.intersect(second, self.debug)
             if cross1:
-                heapq.heappush(self.pqueue, (x, y, before, above))
-                self.crossings[(before, above)] = (x, y)
-        cross2, x, y = below.intersect(after, self.debug)
+                heapq.heappush(self.pqueue, (y, x, before, second))
+                self.crossings[(before, second)] = (x, y)
+        cross2, x, y = first.intersect(after, self.debug)
         if cross2:
-            heapq.heappush(self.pqueue, (x, y, below, after))
-            self.crossings[(below, after)] = (x, y)
+            heapq.heappush(self.pqueue, (y, x, first, after))
+            self.crossings[(first, after)] = (x, y)
 
 
 class TermBST(object):
@@ -758,11 +774,15 @@ class TermBST(object):
             root.right = self.insert_helper(root.right, segment)
         return root
 
-    def swap(self, segment1, segment2):
+    def swap(self, segment1, segment2, b1, b2):
         node1 = self.find(segment1)
         node2 = self.find(segment2)
         node1.segment = segment2
         node2.segment = segment1
+        segment1.b1 = b1
+        segment2.b1 = b1
+        segment1.b2 = b2
+        segment2.b2 = b2
 
     def find(self, segment):
         return self.find_helper(self.root, segment)
@@ -898,29 +918,20 @@ class TermSegment(object):
     """A straight-line portion of a drawn poly-line in the graph rendering."""
 
     def __init__(self, x1, y1, x2, y2):
-        #print "Initting", x1, y1, x2, y2
         self.x1 = x1
         self.x2 = x2
         self.y1 = y1
         self.y2 = y2
 
+        # Initial sort order for crossing detection
+        # Since y is negative, in normal sort order, we start from there
+        self.b1 = y2
+        self.b2 = x2
+
         # Alternative representations for crossing detection
         self.p1 = (x1, y1)
         self.p2 = (x2, y2)
         self.pdiff = (x2 - x1, y2 - y1)
-        if x1 < x2:
-            self.left = (x1, y1)
-            self.right = (x2, y2)
-        elif abs(x1 - x2) < 1e-6:
-            if y1 < y2:
-                self.left = (x1, y1)
-                self.right = (x2, y2)
-            else:
-                self.left = (x2, y2)
-                self.right = (x1, y1)
-        else:
-            self.left = (x2, y2)
-            self.right = (x1, y1)
 
         self.start = None
         self.end = None
@@ -956,13 +967,15 @@ class TermSegment(object):
             link.segments.append(other)
         return other
 
-    def is_left_endpoint(self, x, y):
-        if abs(x - self.left[0]) < 1e-6 and abs(y - self.left[1]) < 1e-6:
+    # The x1, y1 are always the least negative y and therefore
+    # in the sorting order they act as the  bottom
+    def is_bottom_endpoint(self, x, y):
+        if abs(x - self.x1) < 1e-6 and abs(y - self.y1) < 1e-6:
             return True
         return False
 
-    def is_right_endpoint(self, x, y):
-        if abs(x - self.right[0]) < 1e-6 and abs(y - self.right[1]) < 1e-6:
+    def is_top_endpoint(self, x, y):
+        if abs(x - self.x2) < 1e-6 and abs(y - self.y2) < 1e-6:
             return True
         return False
 
@@ -1013,26 +1026,39 @@ class TermSegment(object):
             and self.y2 == other.y2)
 
     # For the line-sweep algorithm, we have some consistent ordering
-    # as we will have a lot of collisions on just x alone.
+    # as we will have a lot of collisions on just y alone.
     def __lt__(self, other):
-        if self.x1 == other.x1:
-            if self.y1 == other.y1:
-                if self.x2 == other.x2:
-                    if self.y2 < other.y2:
+        if self.b1 == other.b1:
+            if self.b2 == other.b2:
+                if self.y1 == other.y1:
+                    if self.x1 < other.x1:
                         return True
-                elif self.x2 < other.x2:
+                elif self.y1 < other.y1:
                     return True
-            elif self.y1 < other.y1:
+            elif self.b2 < other.b2:
                 return True
-        elif self.x1 < other.x1:
+        elif self.b1 < other.b1:
             return True
+
+        return False
+
+    def traditional_sort(self, other):
+        if self.y1 == other.y1:
+            if self.x1 == other.x1:
+                if self.y2 == other.y2:
+                    if self.x2 < other.x2:
+                        return True
+                elif self.y2 < other.y2:
+                    return True
+            elif self.x1 < other.x1:
+                return True
         elif self.y1 < other.y1:
             return True
 
         return False
 
     def __repr__(self):
-        return "TermSegment(%s, %s, %s, %s)" % (self.x1, self.y1,
+        return "[%s, %s] - TermSegment(%s, %s, %s, %s)" % (self.b1, self.b2, self.x1, self.y1,
             self.x2, self.y2)
 
     def __hash__(self):

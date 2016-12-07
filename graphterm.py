@@ -24,7 +24,7 @@ class TermDAG(object):
         self.LEFT = 3
 
         self.layout = False
-        self.debug = True
+        self.debug = False
         self.name = 'default'
 
     def add_node(self, name):
@@ -736,7 +736,7 @@ class TermDAG(object):
         after = self.bst.find_next(second, self.debug)
 
         # Now do the swap
-        self.bst.swap(first, second, c2, c1)
+        self.bst.swap(first, second, c1, c2)
 
         if self.debug:
             print "     Swapping", first, second
@@ -935,8 +935,8 @@ class TermSegment(object):
 
         # Initial sort order for crossing detection
         # Since y is negative, in normal sort order, we start from there
-        self.b1 = y2
-        self.b2 = x2
+        self.b1 = x2
+        self.b2 = y2
 
         # Alternative representations for crossing detection
         self.p1 = (x1, y1)

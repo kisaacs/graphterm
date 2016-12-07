@@ -22,12 +22,14 @@ class TermDAG(object):
         self.DOWN_LEFT = 2
         self.LEFT = 3
 
+        self.layout = False
         self.debug = False
 
     def add_node(self, name):
         tulipNode = self._tulip.addNode()
         node = TermNode(name, tulipNode)
         self._nodes[name] = node
+        self.layout = False
 
     def add_link(self, source, sink):
         tulipLink = self._tulip.addEdge(
@@ -38,6 +40,7 @@ class TermDAG(object):
         self._links.append(link)
         self._nodes[source].add_out_link(link)
         self._nodes[sink].add_in_link(link)
+        self.layout = False
 
     def interactive(self):
         self.layout_hierarchical()
@@ -261,6 +264,8 @@ class TermDAG(object):
             for segment in segments:
                 print segment, segment.gridlist
 
+        self.layout = True
+
     def names_to_grid(self, highlight = ''):
         for row, names in self.row_names.items():
             start = self.row_last[row] + 2 # Space between
@@ -353,6 +358,9 @@ class TermDAG(object):
         return moves
 
     def print_grid(self, with_colors = False):
+        if not self.layout:
+            self.layout_hierarchical()
+
         if not with_colors:
             for row in self.grid:
                 print ''.join(row)

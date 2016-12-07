@@ -39,6 +39,13 @@ class TermDAG(object):
         self._nodes[source].add_out_link(link)
         self._nodes[sink].add_in_link(link)
 
+    def interactive(self):
+        self.layout_hierarchical()
+        curses.wrapper(interactive_helper, self)
+
+        # Persist the depiction with stdout:
+        self.print_grid(True)
+
     def layout_hierarchical(self):
         viewLabel = self._tulip.getStringProperty('viewLabel')
         for node in self._nodes.values():
@@ -1056,3 +1063,12 @@ class TermLink(object):
         self._coords = None
 
         self.segments = []
+
+
+def interactive_helper(stdscr, graph):
+    curses.start_color()
+    can_color = curses.has_colors()
+    curses.use_default_colors()
+    for i in range(0, curses.COLORS):
+        curses.init_pair(i + 1, i, -1)
+    graph.print_interactive(stdscr, can_color)

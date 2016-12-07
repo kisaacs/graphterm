@@ -133,6 +133,9 @@ class TermDAG(object):
             segment.end = self._nodes[link.sink]
 
         if self.debug:
+            self.write_tulip_positions();
+            print "xset", sorted(list(xset))
+            print "yset", sorted(list(yset))
             tlp.saveGraph(self._tulip, self.name + '.tlp')
 
         # Find crossings and create new segments based on them
@@ -173,9 +176,6 @@ class TermDAG(object):
             y += 1
 
         if self.debug:
-            self.write_tulip_positions();
-            print "xset", xsort
-            print "yset", ysort
             print self.gridsize
 
         row_lookup = dict()

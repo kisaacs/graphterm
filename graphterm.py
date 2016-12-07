@@ -24,9 +24,12 @@ class TermDAG(object):
         self.LEFT = 3
 
         self.layout = False
-        self.debug = False
+        self.debug = True
+        self.name = 'default'
 
     def add_node(self, name):
+        if len(self._nodes.keys()) == 0:
+            self.name = name
         tulipNode = self._tulip.addNode()
         node = TermNode(name, tulipNode)
         self._nodes[name] = node
@@ -45,7 +48,8 @@ class TermDAG(object):
 
     def interactive(self):
         self.layout_hierarchical()
-        curses.wrapper(interactive_helper, self)
+        if not self.debug:
+            curses.wrapper(interactive_helper, self)
 
         # Persist the depiction with stdout:
         self.print_grid(True)
@@ -73,6 +77,7 @@ class TermDAG(object):
 
         # Convert Tulip layout to something we can manipulate for both nodes
         # and links.
+        maxy = -1e9
         for node in self._nodes.values():
             coord = viewLayout.getNodeValue(node.tulipNode)
             node._x = coord[0]
@@ -81,6 +86,9 @@ class TermDAG(object):
             yset.add(coord[1])
             node_yset.add(coord[1])
             coord_to_node[(coord[0], coord[1])] = node
+            if coord[1] > maxy:
+                maxy = coord[1]
+                self.name = node.name
 
         for link in self._links:
             link._coords = viewLayout.getEdgeValue(link.tulipLink)
@@ -166,7 +174,7 @@ class TermDAG(object):
             print "xset", xsort
             print "yset", ysort
             print self.gridsize
-            tlp.saveGraph(self._tulip, 'test.tlp')
+            tlp.saveGraph(self._tulip, self.name + '.tlp')
 
         row_lookup = dict()
         col_lookup = dict()

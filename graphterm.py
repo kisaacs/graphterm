@@ -24,7 +24,7 @@ class TermDAG(object):
         self.LEFT = 3
 
         self.layout = False
-        self.debug = False
+        self.debug = True
         self.name = 'default'
         self.pad = None
 
@@ -828,10 +828,16 @@ class TermBST(object):
 
     def find_helper(self, root, segment):
         if root is None or root.segment == segment:
+            if root:
+                print 'is root', root.segment
+            else:
+                print 'is none'
             return root
         elif root.segment > segment:
+            print 'left on', root.segment
             return self.find_helper(root.left, segment)
         else:
+            print 'right on', root.segment
             return self.find_helper(root.right, segment)
 
     def find_previous(self, segment, debug = False):
@@ -1067,10 +1073,10 @@ class TermSegment(object):
     def __lt__(self, other):
         if self.b1 == other.b1:
             if self.b2 == other.b2:
-                if self.y1 == other.y1:
-                    if self.x1 < other.x1:
+                if self.x1 == other.x1:
+                    if self.y1 < other.y1:
                         return True
-                elif self.y1 < other.y1:
+                elif self.x1 < other.x1:
                     return True
             elif self.b2 < other.b2:
                 return True

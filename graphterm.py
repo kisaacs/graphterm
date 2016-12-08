@@ -24,7 +24,7 @@ class TermDAG(object):
         self.LEFT = 3
 
         self.layout = False
-        self.debug = True
+        self.debug = False
         self.name = 'default'
         self.pad = None
 
@@ -891,9 +891,9 @@ class TermBST(object):
                 print "ERROR, could not find", segment, "in delete"
                 self.print_tree()
             return
-        self.root = self.delete_helper(self.root, node)
+        self.root = self.delete_helper(self.root, node, debug)
 
-    def delete_helper(self, root, node):
+    def delete_helper(self, root, node, debug):
         if root.segment == node.segment:
             if node.left is None and node.right is None:
                 return None
@@ -907,16 +907,14 @@ class TermBST(object):
                 while predecessor:
                     last = predecessor
                     predecessor = predecessor.right
-                segment = last.segment
-                last.segment = node.segment
-                node.segment = segment
-                self.delete(last.segment)
+                node.segment = last.segment
+                node.left = self.delete_helper(node.left, last, debug)
                 return node
         else:
             if root.segment > node.segment:
-                root.left = self.delete_helper(root.left, node)
+                root.left = self.delete_helper(root.left, node, debug)
             else:
-                root.right = self.delete_helper(root.right, node)
+                root.right = self.delete_helper(root.right, node, debug)
             return root
 
     def print_tree(self):

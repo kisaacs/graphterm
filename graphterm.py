@@ -24,7 +24,7 @@ class TermDAG(object):
         self.LEFT = 3
 
         self.layout = False
-        self.debug = False
+        self.debug = True
         self.name = 'default'
         self.pad = None
 
@@ -576,10 +576,8 @@ class TermDAG(object):
                 self.grid_colors[y][x] = 5
                 if self.grid[y][x] == ' ' or self.grid[y][x] == char:
                     self.pad.addch(y, x, char, curses.color_pair(5))
-                    #stdscr.addch(y + offset, x, char, curses.color_pair(5))
                 elif char != self.grid[y][x]:
                     self.pad.addch(y, x, 'X', curses.color_pair(5))
-                    #stdscr.addch(y + offset, x, 'X', curses.color_pair(5))
 
     def highlight_node(self, stdscr, name, offset, color):
         if name not in self._nodes:
@@ -587,15 +585,12 @@ class TermDAG(object):
 
         node = self._nodes[name]
         self.pad.addch(node._row, node._col, 'o', curses.color_pair(color))
-        #stdscr.addch(node._row + offset, node._col, 'o', curses.color_pair(color))
         self.grid_colors[node._row][node._col] = color
         label_offset = self.row_last[node._row] + 2
         for i, ch in enumerate(node.name):
             self.grid_colors[node._row][label_offset + node.label_pos + i] = color
             self.pad.addch(node._row, label_offset + node.label_pos + i,
                 ch, curses.color_pair(color))
-            #stdscr.addch(node._row + offset, label_offset + node.label_pos + i,
-            #    ch, curses.color_pair(color))
 
         return name
 
@@ -605,7 +600,6 @@ class TermDAG(object):
                 self.grid_colors[h][w] = 0
                 if self.grid[h][w] != '':
                     self.pad.addch(h, w, self.grid[h][w])
-                    #stdscr.addch(h + offset, w, self.grid[h][w])
                 else:
                     continue
 

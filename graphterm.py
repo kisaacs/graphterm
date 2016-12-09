@@ -166,7 +166,6 @@ class TermDAG(object):
             segments.add(new_segment2)
             xset.add(x)
             yset.add(y)
-        return
 
         # Based on the tulip layout, do the following:
         xsort = sorted(list(xset))
@@ -695,24 +694,6 @@ class TermDAG(object):
            negative values. We think of this as just having the DAG
            upside down and sweeping from top to bottom.
         """
-        segments = []
-        segments.append(TermSegment(-33.5, -3.5, -24.5, -6, 'cc'))
-        segments.append(TermSegment(-27.5, -3.5, -30.5, -6, 'de'))
-        segments.append(TermSegment(-27.5, -3.5, -24.5, -6, 'dc'))
-        segments.append(TermSegment(-27.5, -3.5, -18.5, -6, 'dl'))
-        segments.append(TermSegment(-27.5, -3.5, -12.5, -6, 'db'))
-        segments.append(TermSegment(-22.5, -3.5, -24.5, -6, 'ac'))
-        segments.append(TermSegment(5.5, -3.5, -24.5, -6, 'uc'))
-        segments.append(TermSegment(-18.5, -3.5, -18.5, -6, 'cl'))
-        segments.append(TermSegment(-12.5, -3.5, -12.5, -6, 'ab'))
-        segments.append(TermSegment(11.5, -3.5, -12.5, -6, 'ub'))
-        segments.append(TermSegment(-12.5, -3.5, -6.5, -6, 'am'))
-        segments.append(TermSegment(-6.5, -3.5, -6.5, -6, 'cm'))
-        segments.append(TermSegment(17.5, -3.5, -6.5, -6, 'um'))
-        segments.append(TermSegment(-0.5, 0, -0.5, -9.5, 'ce'))
-
-
-
         self.bst = TermBST() # BST of segments crossing L
         self.pqueue = [] # Priority Queue of potential future events
         self.crossings = dict() # Will be (segment1, segment2) = (x, y)
@@ -821,10 +802,7 @@ class TermDAG(object):
 
         # Remove crossings between first/before and second/after
         # from the priority queue
-        print "crossings are", self.crossings.keys()
-        print 'checking', (second, after)
         if second and after and (second.name, after.name) in self.crossings:
-            print "crossing for", second, after
             x, y = self.crossings[(second.name, after.name)]
             if (y, x, second, after) in self.pqueue:
                 self.pqueue.remove((y, x, second, after))

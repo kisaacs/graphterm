@@ -24,7 +24,7 @@ class TermDAG(object):
         self.LEFT = 3
 
         self.layout = False
-        self.debug = True
+        self.debug = False
         self.name = 'default'
         self.pad = None
 
@@ -54,6 +54,9 @@ class TermDAG(object):
 
         # Persist the depiction with stdout:
         self.print_grid(True)
+
+    def report(self):
+        return self.layout_hierarchical()
 
     def layout_hierarchical(self):
         viewLabel = self._tulip.getStringProperty('viewLabel')
@@ -271,9 +274,12 @@ class TermDAG(object):
         segments = sorted(segments, key = lambda x: x.for_segment_sort())
 
         # Add segments to the grid
+        status = 'passed'
         for segment in segments:
             segment.gridlist =  self.draw_line(segment)
-            self.row_last = self.set_to_grid(segment, self.row_last)
+            self.row_last, err = self.set_to_grid(segment, self.row_last)
+            if not err:
+                status = 'drawing'
 
         # Add labels to the grid
         self.names_to_grid()
@@ -284,6 +290,7 @@ class TermDAG(object):
                 print segment, segment.gridlist
 
         self.layout = True
+        return status
 
     def names_to_grid(self, highlight = ''):
         for row, names in self.row_names.items():
@@ -293,6 +300,7 @@ class TermDAG(object):
                 start += 1
 
     def set_to_grid(self, segment, row_last):
+        success = True
         start = segment.start
         end = segment.end
         last_x = start._col
@@ -311,6 +319,7 @@ class TermDAG(object):
                 self.grid[y][x] = char
             elif char != self.grid[y][x]:
                 print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
+                success = False
                 self.grid[y][x] = 'X'
             if x > row_last[y]:
                 row_last[y] = x
@@ -319,7 +328,7 @@ class TermDAG(object):
 
             if self.debug:
                 self.print_grid()
-        return row_last
+        return row_last, success
 
     def draw_line(self, segment):
         x1 = segment.start._col

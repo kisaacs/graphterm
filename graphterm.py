@@ -1090,6 +1090,10 @@ class TermSegment(object):
         self.gridlist = []
         self.links = []
 
+        # From splits
+        self.children = []
+        self.origin = self
+
     def for_segment_sort(self):
         xlen = abs(self.x1 - self.x2)
         ylen = abs(self.y1 - self.y2)
@@ -1108,15 +1112,33 @@ class TermSegment(object):
 
            Note the new segment is always the second part (closer to the sink).
         """
-        other = TermSegment(node._x, node._y, self.x2, self.y2)
+
+        # The one we are splitting from -- may have been updated by a prevoius split
+        splitter = self
+        if node._y > self.y1 or node._y < self.y2:
+            for child in self.origin.children:
+                if node._y < child.y1 and node._y > child.y2:
+                    splitter = child
+
+        #print "Breakpoint is", node._x, node._y
+        #print "Self is", self
+        #print "Splitter is", splitter
+
+        other = TermSegment(node._x, node._y, splitter.x2, splitter.y2)
         other.start = node
-        other.end = self.end
-        other.name = str(self.name) + '-B'
-        self.end = node
-        self.x2 = node._x
-        self.y2 = node._y
-        for link in self.links:
+        other.end = splitter.end
+        other.name = str(splitter.name) + '-B'
+        splitter.end = node
+        splitter.x2 = node._x
+        splitter.y2 = node._y
+        for link in splitter.links:
             link.segments.append(other)
+
+        other.origin = self.origin
+        self.origin.children.append(other)
+
+        #print "Other is", other
+
         return other
 
     # The x1, y1 are always the least negative y and therefore

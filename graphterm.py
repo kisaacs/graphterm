@@ -886,15 +886,19 @@ class TermBST(object):
     def insert_helper(self, root, segment):
         if root is None:
             root = TermBSTNode(segment)
+            segment.BSTNode = root
         elif root.segment > segment:
             root.left = self.insert_helper(root.left, segment)
+            root.left.parent = root
         else:
             root.right = self.insert_helper(root.right, segment)
+            root.right.parent = root
         return root
 
+
     def swap(self, segment1, segment2, b1, b2):
-        node1 = self.find(segment1)
-        node2 = self.find(segment2)
+        node1 = segment1.BSTNode
+        node2 = segment2.BSTNode
         node1.segment = segment2
         node2.segment = segment1
         segment1.b1 = b1
@@ -905,6 +909,7 @@ class TermBST(object):
     def find(self, segment):
         return self.find_helper(self.root, segment)
 
+
     def find_helper(self, root, segment):
         if root is None or root.segment == segment:
             return root
@@ -913,8 +918,9 @@ class TermBST(object):
         else:
             return self.find_helper(root.right, segment)
 
+
     def find_previous(self, segment, debug = False):
-        node = self.find(segment)
+        node = segment.BSTNode 
         if node is None and debug:
             print "ERROR, could not find", segment, " in find_previous"
             return None
@@ -927,19 +933,19 @@ class TermBST(object):
             return last.segment
         else:
             predecessor = None
-            search = self.root
+            last = node
+            search = node.parent
             while search:
-                if segment > search.segment:
-                    predecessor = search.segment
-                    search = search.right
-                elif segment < search.segment:
-                    search = search.left
+                if search.right == last:
+                    return search.segment
                 else:
-                    break
+                    last = search
+                    search = search.parent
             return predecessor
 
+
     def find_next(self, segment, debug = False):
-        node = self.find(segment)
+        node = segment.BSTNode
         if node is None and debug:
             print "ERROR, could not find", segment, " in find_next"
             return None
@@ -952,49 +958,62 @@ class TermBST(object):
             return last.segment
         else:
             successor = None
-            search = self.root
+            last = node
+            search = node.parent
             while search:
-                if segment < search.segment:
-                    successor = search.segment
-                    search = search.left
-                elif segment > search.segment:
-                    search = search.right
+                if search.left == last:
+                    return search.segment
                 else:
-                    break
+                    last = search
+                    search = search.parent
             return successor
 
+
     def delete(self, segment, debug = False):
-        node = self.find(segment)
+        #node = self.find(segment)
+        node = segment.BSTNode
+        segment.BSTNode = None
         if node is None:
             if debug:
                 print "ERROR, could not find", segment, "in delete"
                 self.print_tree()
             return
-        self.root = self.delete_helper(self.root, node, debug)
 
-    def delete_helper(self, root, node, debug):
-        if root.segment == node.segment:
-            if node.left is None and node.right is None:
-                return None
-            elif node.left is None:
-                return node.right
-            elif node.right is None:
-                return node.left
-            else:
-                predecessor = node.left
-                last = predecessor
-                while predecessor:
-                    last = predecessor
-                    predecessor = predecessor.right
-                node.segment = last.segment
-                node.left = self.delete_helper(node.left, last, debug)
-                return node
+        replacement = None
+        if node.left is None and node.right is None:
+            replacement = None
+
+        elif node.left is None:
+            replacement = node.right
+
+        elif node.right is None:
+            replacement = node.left
+
         else:
-            if root.segment > node.segment:
-                root.left = self.delete_helper(root.left, node, debug)
-            else:
-                root.right = self.delete_helper(root.right, node, debug)
-            return root
+            predecessor = node.left
+            last = predecessor
+            while predecessor:
+                last = predecessor
+                predecessor = predecessor.right
+            node.segment = last.segment
+            self.delete(last.segment, debug)
+            replacement = node
+            replacement.segment.BSTNode = replacement
+
+        if not node.parent:  # We must have been the root
+            self.root = replacement
+        elif node.parent.left == node:
+            node.parent.left = replacement
+        elif node.parent.right == node:
+            node.parent.right = replacement
+        else:
+            if debug:
+                print "ERROR, parenting error on", segment, "in delete"
+                self.print_tree()
+            return
+
+        if replacement:
+            replacement.parent = node.parent
 
     def print_tree(self):
         print '--- Tree ---'
@@ -1029,6 +1048,7 @@ class TermBSTNode(object):
         self.segment = segment
         self.left = None
         self.right = None
+        self.parent = None
 
 class TermSegment(object):
     """A straight-line portion of a drawn poly-line in the graph rendering."""
@@ -1039,6 +1059,7 @@ class TermSegment(object):
         self.y1 = y1
         self.y2 = y2
         self.name = name
+        self.BSTNode = None
 
         # Initial sort order for crossing detection
         # Since y is negative, in normal sort order, we start from there

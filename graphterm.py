@@ -310,18 +310,24 @@ class TermDAG(object):
             print '   Drawing segment [', segment.start._col, ',', \
                 segment.start._row, '] to [', segment.end._col, ',', \
                 segment.end._row, ']', segment.gridlist, segment
-        for coord in segment.gridlist:
-            x, y, char = coord
+        for i, coord in enumerate(segment.gridlist):
+            x, y, char, draw = coord
             if self.debug:
                 print 'Drawing', char, 'at', x, y
-            if char == '':
+            if not draw or char == '':
                 continue
             if self.grid[y][x] == ' ':
                 self.grid[y][x] = char
             elif char != self.grid[y][x]:
-                print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
-                success = False
-                self.grid[y][x] = 'X'
+                # Pipe takes precedence over _
+                if char == '_' and self.grid[y][x] == '|':
+                    segment.gridlist[i] = (x, y, char, False)
+                elif char == '|' and self.grid[y][x] == '_':
+                        self.grid[y][x] = char
+                else:
+                    print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
+                    success = False
+                    self.grid[y][x] = 'X'
             if x > row_last[y]:
                 row_last[y] = x
             last_x = x
@@ -363,7 +369,7 @@ class TermDAG(object):
             for y in range(y1, y2 - max(0, xdist - 1)):
                 if self.debug:
                     print 'moving vertical with', x1, y
-                moves.append((x1, y, '|'))
+                moves.append((x1, y, '|', True))
                 currenty = y
         else:
             currenty = y1 - 1
@@ -372,7 +378,7 @@ class TermDAG(object):
             for x in range(x1 + xdir, x2 - xdir * (ydist), xdir):
                 if self.debug:
                     print 'moving horizontal with', x, (y1 - 1)
-                moves.append((x, y1 - 1, '_'))
+                moves.append((x, y1 - 1, '_', True))
                 currentx = x
 
         for y in range(currenty + 1, y2):
@@ -380,9 +386,9 @@ class TermDAG(object):
             if self.debug:
                 print 'moving diag to', currentx, y
             if xdir == 1:
-                moves.append((currentx, y, '\\'))
+                moves.append((currentx, y, '\\', True))
             else:
-                moves.append((currentx, y, '/'))
+                moves.append((currentx, y, '/', True))
 
         return moves
 
@@ -586,15 +592,21 @@ class TermDAG(object):
 
     def highlight_segments(self, stdscr, segments, offset):
         for segment in segments:
-            for coord in segment.gridlist:
-                x, y, char = coord
-                if char == '':
+            for i, coord in enumerate(segment.gridlist):
+                x, y, char, draw = coord
+                if not draw or char == '':
                     continue
                 self.grid_colors[y][x] = 5
                 if self.grid[y][x] == ' ' or self.grid[y][x] == char:
                     self.pad.addch(y, x, char, curses.color_pair(5))
                 elif char != self.grid[y][x]:
-                    self.pad.addch(y, x, 'X', curses.color_pair(5))
+                    if char == '_' and self.grid[y][x] == '|':
+                        segment.gridlist[i] = (x, y, char, False)
+                    elif char == '|' and self.grid[y][x] == '_':
+                            self.grid[y][x] = char
+                            self.pad.addch(y, x,char, curses.color_pair(5))
+                    else:
+                        self.pad.addch(y, x, 'X', curses.color_pair(5))
 
     def highlight_node(self, stdscr, name, offset, color):
         if name not in self._nodes:

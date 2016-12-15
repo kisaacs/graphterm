@@ -24,7 +24,7 @@ class TermDAG(object):
         self.LEFT = 3
 
         self.layout = False
-        self.debug = False
+        self.debug = True
         self.name = 'default'
         self.pad = None
 
@@ -307,6 +307,7 @@ class TermDAG(object):
         last_x = start._col
         last_y = start._row
         if self.debug:
+            print '   Drawing', segment
             print '   Drawing segment [', segment.start._col, ',', \
                 segment.start._row, '] to [', segment.end._col, ',', \
                 segment.end._row, ']', segment.gridlist, segment
@@ -343,7 +344,7 @@ class TermDAG(object):
         x2 = segment.end._col
         y2 = segment.end._row
         if self.debug:
-            print 'Drawing', x1, y1, x2, y2
+            print 'Drawing', x1, y1, x2, y2, segment
 
         if segment.start.real:
             if self.debug:
@@ -1110,6 +1111,7 @@ class TermSegment(object):
         other = TermSegment(node._x, node._y, self.x2, self.y2)
         other.start = node
         other.end = self.end
+        other.name = str(self.name) + '-B'
         self.end = node
         self.x2 = node._x
         self.y2 = node._y

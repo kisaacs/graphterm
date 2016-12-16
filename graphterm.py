@@ -408,26 +408,33 @@ class TermDAG(object):
         if not self.layout and not self.debug:
             self.layout_hierarchical()
 
+        row_begin = self.pad_corner_x
+        row_end = min(self.gridsize[1], self.pad_corner_x + self.width - 1)
         if not with_colors or not self.grid_colors:
             for row in self.grid:
-                print ''.join(row)
+                if self.width == 0 or self.width > self.gridsize[1]:
+                    print ''.join(row)
+                else:
+                    window = row[rowbegin:rowend]
+                    print ''.join(window)
             return
 
         for i in range(self.gridsize[0]):
-            print self.print_color_row(i)
+            print self.print_color_row(i, row_begin, row_end)
 
 
-    def print_color_row(self, i):
+    def print_color_row(self, i, start, end):
         text = self.grid[i]
         colors = self.grid_colors[i]
 
         color = -1
         string = ''
         for i, ch in enumerate(text):
-            if colors[i] != color:
-                color = colors[i]
-                string += '\x1b[' + str(self.to_ansi_foreground(color)) + 'm'
-            string += ch
+            if i >= start and i <= end:
+                if colors[i] != color:
+                    color = colors[i]
+                    string += '\x1b[' + str(self.to_ansi_foreground(color)) + 'm'
+                string += ch
 
         string += '\x1b[0m'
         return string

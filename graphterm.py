@@ -26,7 +26,18 @@ class TermDAG(object):
         self.layout = False
         self.debug = False
         self.name = 'default'
+
+
         self.pad = None
+        self.pad_pos_x = 0
+        self.pad_pos_y = 0
+        self.pad_extent_x = 0
+        self.pad_extent_y = 0
+        self.pad_corner_x = 0
+        self.pad_corner_y = 0
+        self.height = 0
+        self.width = 0
+        self.offset = 0
 
     def add_node(self, name):
         if len(self._nodes.keys()) == 0:
@@ -435,27 +446,40 @@ class TermDAG(object):
         string += ')'
         return string
 
+    def resize(self, stdscr):
+        self.height, self.width = stdscr.getmaxyx()
+        self.offset = self.height - self.gridsize[0] - 1
+
+        self.pad_extent_y = self.height - 1 # lower left of pad winndow
+        if self.gridsize[0] < self.height:
+            self.pad_pos_y = self.height - self.gridsize[0] - 1 # upper left of pad window
+        else:
+            self.pad_pos_y = 0
+            self.pad_corner_y = self.gridsize[0] - self.height #FIXME
+
+        self.pad_pos_x = 0 # position of pad window upper left
+        if self.gridsize[1] + 1 < self.width:
+            self.pad_extent_x = self.gridsize[1] + 1
+        else:
+            self.pad_extent_x = self.width - 1
+
+
+    def scroll(self, stdscr):
+        pass
+
+    def refresh_pad(self):
+        self.pad.refresh(self.pad_corner_y, self.pad_corner_x,
+            self.pad_pos_y, self.pad_pos_x,
+            self.pad_extent_y, self.pad_extent_x)
+
+
     def print_interactive(self, stdscr, has_colors = False):
-        height, width = stdscr.getmaxyx()
         self.pad = curses.newpad(self.gridsize[0] + 1, self.gridsize[1] + 1)
-        offset = height - self.gridsize[0] - 1
-
         self.pad.addstr(0, 0, str(self.gridsize))
+        self.pad_corner_y = 0 # upper left position inside pad
+        self.pad_corner_x = 0 # position shown in the pad
 
-        pad_extent_y = height - 1 # lower left of pad winndow
-        if self.gridsize[0] < height:
-            pad_coord_y = height - self.gridsize[0] - 1 # upper left of pad window
-            pad_pos_y = 0 # upper left position inside pad
-        else:
-            pad_coord_y = 0
-            pad_pos_y = self.gridsize[0] - height
-
-        pad_pos_x = 0 # position shown in the pad
-        pad_coord_x = 0 # position of pad window upper left
-        if self.gridsize[1] + 1 < width:
-            pad_extent_x = self.gridsize[1] + 1
-        else:
-            pad_extent_x = width - 1
+        self.resize(stdscr)
 
         if self.debug:
             stdscr.move(0, 0)
@@ -474,11 +498,10 @@ class TermDAG(object):
             self.grid_colors.append([0 for x in range(self.gridsize[1])])
 
         # Draw initial grid and initialize colors to default
-        self.redraw_default(stdscr, offset)
-        stdscr.move(height - 1, 0)
+        self.redraw_default(stdscr, self.offset)
+        stdscr.move(self.height - 1, 0)
         stdscr.refresh()
-        self.pad.refresh(pad_pos_y, pad_pos_x, pad_coord_y, pad_coord_x,
-            pad_extent_y, pad_extent_x)
+        self.refresh_pad()
 
         command = ''
         selected = ''
@@ -486,6 +509,10 @@ class TermDAG(object):
             ch = stdscr.getch()
             if ch == curses.KEY_MOUSE:
                 pass
+            elif ch == curses.KEY_RESIZE:
+                self.resize(stdscr)
+                stdscr.refresh()
+                self.refresh_pad()
             elif command == '': # Awaiting new Command
 
                 # Quit
@@ -505,10 +532,9 @@ class TermDAG(object):
                     ch = curses.ascii.unctrl(ch)
                     if ch[0] == '^' and len(ch) > 1:
                         if (ch[1] == 'a' or ch[1] == 'A') and selected:
-                            self.highlight_neighbors(stdscr, selected, offset)
-                            self.pad.refresh(pad_pos_y, pad_pos_x, pad_coord_y, pad_coord_x,
-                                pad_extent_y, pad_extent_x)
-                            stdscr.move(height - 1, 0)
+                            self.highlight_neighbors(stdscr, selected, self.offset)
+                            self.refresh_pad()
+                            stdscr.move(self.height - 1, 0)
                             stdscr.refresh()
                         elif (ch[1] == 'w' or ch[1] == 'W'):
                             if selected:
@@ -517,10 +543,9 @@ class TermDAG(object):
                             else:
                                 selected = self.node_order[0].name
 
-                            self.select_node(stdscr, selected, offset)
-                            self.pad.refresh(pad_pos_y, pad_pos_x, pad_coord_y, pad_coord_x,
-                                pad_extent_y, pad_extent_x)
-                            stdscr.move(height - 1, 0)
+                            self.select_node(stdscr, selected, self.offset)
+                            self.refresh_pad()
+                            stdscr.move(self.height - 1, 0)
                             stdscr.refresh()
                         elif (ch[1] == 'b' or ch[1] == 'B'):
                             if selected:
@@ -529,33 +554,31 @@ class TermDAG(object):
                             else:
                                 selected = self.node_order[-1].name
 
-                            self.select_node(stdscr, selected, offset)
-                            self.pad.refresh(pad_pos_y, pad_pos_x, pad_coord_y, pad_coord_x,
-                                pad_extent_y, pad_extent_x)
-                            stdscr.move(height - 1, 0)
+                            self.select_node(stdscr, selected, self.offset)
+                            self.refresh_pad()
+                            stdscr.move(self.height - 1, 0)
                             stdscr.refresh()
 
             else: # Command in progress
 
                 # Accept Command
                 if ch == curses.KEY_ENTER or ch == 10:
-                    stdscr.move(height - 1, 0)
+                    stdscr.move(self.height - 1, 0)
                     for i in range(len(command)):
                         stdscr.addstr(' ')
 
-                    selected = self.select_node(stdscr, command[1:], offset)
-                    self.pad.refresh(pad_pos_y, pad_pos_x, pad_coord_y, pad_coord_x,
-                        pad_extent_y, pad_extent_x)
-                    stdscr.move(height - 1, 0)
+                    selected = self.select_node(stdscr, command[1:], self.offset)
+                    self.refresh_pad()
+                    stdscr.move(self.height - 1, 0)
                     stdscr.refresh()
                     command = ''
 
                 # Handle Backspace
                 elif ch == curses.KEY_BACKSPACE:
                     command = command[:-1]
-                    stdscr.move(height - 1, len(command))
+                    stdscr.move(self.height - 1, len(command))
                     stdscr.addstr(' ')
-                    stdscr.move(height - 1, len(command))
+                    stdscr.move(self.height - 1, len(command))
                     stdscr.refresh()
 
                 # New character

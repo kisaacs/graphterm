@@ -447,15 +447,23 @@ class TermDAG(object):
         return string
 
     def resize(self, stdscr):
+        old_height = self.height
         self.height, self.width = stdscr.getmaxyx()
         self.offset = self.height - self.gridsize[0] - 1
 
         self.pad_extent_y = self.height - 1 # lower left of pad winndow
         if self.gridsize[0] < self.height:
             self.pad_pos_y = self.height - self.gridsize[0] - 1 # upper left of pad window
+            self.pad_corner_y = 0
         else:
             self.pad_pos_y = 0
-            self.pad_corner_y = self.gridsize[0] - self.height #FIXME
+
+            # Maintain the bottom of the graph in the same place
+            if old_height == 0:
+                self.pad_corner_y = self.gridsize[0] - self.height
+            else:
+                bottom = self.pad_corner_y + old_height
+                self.pad_corner_y = max(0, bottom - self.height)
 
         self.pad_pos_x = 0 # position of pad window upper left
         if self.gridsize[1] + 1 < self.width:
@@ -464,8 +472,21 @@ class TermDAG(object):
             self.pad_extent_x = self.width - 1
 
 
-    def scroll(self, stdscr):
-        pass
+    def scroll_up(self):
+        if self.pad_corner_y + (self.pad_extent_y - self.pad_pos_y) < self.gridsize[0]:
+            self.pad_corner_y += 1
+
+    def scroll_down(self):
+        if self.pad_corner_y > 0:
+            self.pad_corner_y -= 1
+
+    def scroll_left(self):
+        if self.pad_corner_x + self.width < self.gridsize[1]:
+            self.pad_corner_x += 1
+
+    def scroll_right(self):
+        if self.pad_corner_x > 0:
+            self.pad_corner_x -= 1
 
     def refresh_pad(self):
         self.pad.refresh(self.pad_corner_y, self.pad_corner_x,
@@ -511,6 +532,7 @@ class TermDAG(object):
                 pass
             elif ch == curses.KEY_RESIZE:
                 self.resize(stdscr)
+                stdscr.clear()
                 stdscr.refresh()
                 self.refresh_pad()
             elif command == '': # Awaiting new Command
@@ -526,6 +548,27 @@ class TermDAG(object):
                     command = ch
                     stdscr.addstr(ch)
                     stdscr.refresh()
+
+                # Scroll (TODO: Trackpad scroll)
+                elif ch == ord('w'):
+                    self.scroll_up()
+                    stdscr.refresh()
+                    self.refresh_pad()
+
+                elif ch == ord('s'):
+                    self.scroll_down()
+                    stdscr.refresh()
+                    self.refresh_pad()
+
+                elif ch == ord('d'):
+                    self.scroll_right()
+                    stdscr.refresh()
+                    self.refresh_pad()
+
+                elif ch == ord('a'):
+                    self.scroll_left()
+                    stdscr.refresh()
+                    self.refresh_pad()
 
                 # Start Ctrl Command
                 else:

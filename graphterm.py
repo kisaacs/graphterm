@@ -24,7 +24,7 @@ class TermDAG(object):
         self.LEFT = 3
 
         self.layout = False
-        self.debug = True
+        self.debug = False
         self.name = 'default'
         self.pad = None
 
@@ -455,7 +455,7 @@ class TermDAG(object):
         if self.gridsize[1] + 1 < width:
             pad_extent_x = self.gridsize[1] + 1
         else:
-            pad_extent_x = width
+            pad_extent_x = width - 1
 
         if self.debug:
             stdscr.move(0, 0)

@@ -164,21 +164,28 @@ class TermDAG(object):
         if self.debug:
             print "CROSSINGS ARE: "
             #return
+
+        # Consolidate crossing points
+        crossings_points = dict()
         for k, v in self.crossings.items():
+            if v not in crossings_points:
+                crossings_points[v] = set()
+            crossings_points[v].add(k[0])
+            crossings_points[v].add(k[1])
+
+        for v, k in crossings_points.items():
             if self.debug:
                 print k, v
-            segment1 = self.segment_ids[k[0]]
-            segment2 = self.segment_ids[k[1]]
             x, y = v
             placer = TermNode('', None, False)
             placer._x = x
             placer._y = y
             coord_to_node[(x,y)] = placer
             coord_to_placer[(x,y)] = placer
-            new_segment1 = segment1.split(placer)
-            new_segment2 = segment2.split(placer)
-            segments.add(new_segment1)
-            segments.add(new_segment2)
+            for name in k:
+                segment = self.segment_ids[name]
+                new_segment = segment.split(placer)
+                segments.add(new_segment)
             xset.add(x)
             yset.add(y)
 

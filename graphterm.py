@@ -25,6 +25,7 @@ class TermDAG(object):
 
         self.layout = False
         self.debug = False
+        self.output_tulip = True
         self.name = 'default'
 
 
@@ -157,6 +158,7 @@ class TermDAG(object):
             self.write_tulip_positions();
             print "xset", sorted(list(xset))
             print "yset", sorted(list(yset))
+        if self.output_tulip:
             tlp.saveGraph(self._tulip, self.name + '.tlp')
 
         # Find crossings and create new segments based on them
@@ -1207,11 +1209,11 @@ class TermSegment(object):
         other = TermSegment(node._x, node._y, splitter.x2, splitter.y2)
         other.start = node
         other.end = splitter.end
-        other.name = str(splitter.name) + '-B'
+        other.name = str(self.origin.name) + '-(' + str(node._x) + ')'
         splitter.end = node
         splitter.x2 = node._x
         splitter.y2 = node._y
-        for link in splitter.links:
+        for link in self.origin.links:
             link.segments.append(other)
 
         other.origin = self.origin

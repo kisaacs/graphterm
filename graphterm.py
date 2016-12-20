@@ -17,6 +17,8 @@ class TermDAG(object):
         self.gridedge = [] # the last char per row
         self.grid = []
         self.grid_colors = []
+        self.row_max = 0
+        self.row_names = dict()
 
         self.RIGHT = 0
         self.DOWN_RIGHT = 1
@@ -27,7 +29,6 @@ class TermDAG(object):
         self.debug = False
         self.output_tulip = True
         self.name = 'default'
-
 
         self.pad = None
         self.pad_pos_x = 0
@@ -235,36 +236,11 @@ class TermDAG(object):
         for row, nodes in row_nodes.items():
             row_nodes[row] = sorted(nodes, key = lambda node: node._col)
 
-        # Figure out the amount of space needed based on the labels
-        row_max = self.gridsize[1]
-        self.row_names = dict()
-        names = ''
-        for row, nodes in row_nodes.items():
-            pos = 0
-            first = nodes[-1].name # Draw the last next to its node
-            nodes[-1].label_pos = pos
-            pos += len(first)
-
-            # Draw the rest in a bracketed list]
-            rest = ''
-            if len(nodes) > 1:
-                for node in nodes[:-1]:
-                    if rest == '':
-                        rest = ' [ ' + node.name
-                        node.label_pos = pos + 3
-                        pos += len(node.name) + 3
-                    else:
-                        rest += ', ' + node.name
-                        node.label_pos = pos + 2
-                        pos += len(node.name) + 2
-                rest += ' ]'
-            names = first + rest
-            row_max = max(row_max, self.gridsize[1] + 1 + len(names))
-            self.row_names[row] = names
+        self.calculate_labels(row_nodes)
 
         # Max number of columns needed -- we add one for a space
         # between the graph and the labels.
-        self.gridsize[1] = row_max + 1
+        self.gridsize[1] = self.row_max + 1
 
         # Find the node order:
         self.node_order = sorted(self._nodes.values(),
@@ -303,6 +279,7 @@ class TermDAG(object):
                 status = 'drawing'
 
         # Add labels to the grid
+        self.calculate_labels(row_nodes, check_grid = True)
         self.names_to_grid()
 
         if self.debug:
@@ -312,6 +289,58 @@ class TermDAG(object):
 
         self.layout = True
         return status
+
+    def calculate_labels(self, row_nodes, check_grid = False):
+        # Figure out the max amount of space needed based on the labels
+        self.row_max = self.gridsize[1]
+        self.row_names = dict()
+        names = ''
+        for row, nodes in row_nodes.items():
+            pos = 0
+            first = nodes[-1].name # Draw the last next to its node
+            nodes[-1].label_pos = pos
+            pos += len(first)
+
+            # Draw the rest in a bracketed list]
+            rest = ''
+            if len(nodes) > 1:
+                for node in nodes[:-1]:
+                    can_place = False
+                    if check_grid: # Attempt to place the label
+                        can_place = True
+                        y = node._row
+                        x = node._col + 2 # start one space after node
+                        characters = len(node.name) + 1 # (space after)
+                        while characters > 0 and can_place:
+                            if self.grid[y][x] != '' and self.grid[y][x] != ' ':
+                                can_place = False
+                                break
+                            x += 1
+                            characters -= 1
+
+                    if can_place:
+                        x = node._col + 2
+                        node.label_pos = x
+                        node.use_offset = False
+                        for ch in node.name:
+                            self.grid[y][x] = ch
+                            x += 1
+                    else: # Everything goes on the end
+                        node.use_offset = True
+                        if rest == '':
+                            rest = ' [ ' + node.name
+                            node.label_pos = pos + 3
+                            pos += len(node.name) + 3
+                        else:
+                            rest += ', ' + node.name
+                            node.label_pos = pos + 2
+                            pos += len(node.name) + 2
+
+                if rest != '':
+                    rest += ' ]'
+            names = first + rest
+            self.row_max = max(self.row_max, self.gridsize[1] + 1 + len(names))
+            self.row_names[row] = names
 
     def names_to_grid(self, highlight = ''):
         for row, names in self.row_names.items():
@@ -716,7 +745,9 @@ class TermDAG(object):
         node = self._nodes[name]
         self.pad.addch(node._row, node._col, 'o', curses.color_pair(color))
         self.grid_colors[node._row][node._col] = color
-        label_offset = self.row_last[node._row] + 2
+        label_offset = 0
+        if node.use_offset:
+            label_offset = self.row_last[node._row] + 2
         for i, ch in enumerate(node.name):
             self.grid_colors[node._row][label_offset + node.label_pos + i] = color
             self.pad.addch(node._row, label_offset + node.label_pos + i,
@@ -1352,6 +1383,7 @@ class TermNode(object):
         self._col = 0 # Int
         self._row = 0 # Int
         self.label_pos = -1 # Int
+        self.use_offset = True
         self.tulipNode = tulip
 
         self.real = real # Real node or segment connector?

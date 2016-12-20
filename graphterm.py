@@ -340,11 +340,21 @@ class TermDAG(object):
             if self.grid[y][x] == ' ':
                 self.grid[y][x] = char
             elif char != self.grid[y][x]:
-                # Pipe takes precedence over _
-                if char == '_' and self.grid[y][x] == '|':
+                # Precedence:
+                #   Slash
+                #   Pipe
+                #   Underscore
+                if char == '_' and (self.grid[y][x] == '|'
+                    or self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
                     segment.gridlist[i] = (x, y, char, False)
-                elif char == '|' and self.grid[y][x] == '_':
-                        self.grid[y][x] = char
+                elif (char == '|' or char == '/' or char == '\\') \
+                    and self.grid[y][x] == '_':
+                    self.grid[y][x] = char
+                elif char == '|' and (self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
+                    segment.gridlist[i] = (x, y, char, False)
+                elif (char == '/' or char == '\\') \
+                    and self.grid[y][x] == '|':
+                    self.grid[y][x] = char
                 else:
                     print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
                     success = False
@@ -683,11 +693,19 @@ class TermDAG(object):
                 if self.grid[y][x] == ' ' or self.grid[y][x] == char:
                     self.pad.addch(y, x, char, curses.color_pair(5))
                 elif char != self.grid[y][x]:
-                    if char == '_' and self.grid[y][x] == '|':
+                    if char == '_' and (self.grid[y][x] == '|'
+                        or self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
                         segment.gridlist[i] = (x, y, char, False)
-                    elif char == '|' and self.grid[y][x] == '_':
-                            self.grid[y][x] = char
-                            self.pad.addch(y, x,char, curses.color_pair(5))
+                    elif (char == '|' or char == '/' or char == '\\') \
+                        and self.grid[y][x] == '_':
+                        self.grid[y][x] = char
+                        self.pad.addch(y, x,char, curses.color_pair(5))
+                    elif char == '|' and (self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
+                        segment.gridlist[i] = (x, y, char, False)
+                    elif (char == '/' or char == '\\') \
+                        and self.grid[y][x] == '|':
+                        self.grid[y][x] = char
+                        self.pad.addch(y, x,char, curses.color_pair(5))
                     else:
                         self.pad.addch(y, x, 'X', curses.color_pair(5))
 

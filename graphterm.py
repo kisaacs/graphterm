@@ -41,6 +41,26 @@ class TermDAG(object):
         self.width = 0
         self.offset = 0
 
+        self.hpad = None # Help Pad
+        self.hpad_default = 'h - toggle help'
+        self.hpad_pos_x = 0
+        self.hpad_pos_y = 0
+        self.hpad_extent_x = len(self.hpad_default)
+        self.hpad_extent_y = 2
+        self.hpad_corner_x = 0
+        self.hpad_corner_y = 0
+        self.hpad_collapsed = True
+        self.hpad_lines = []
+        self.hpad_lines.append('      ' + self.hpad_default)
+        self.hpad_lines.append('   /foo - highlight node foo')
+        self.hpad_lines.append(' ctrl-w - advance node')
+        self.hpad_lines.append(' ctrl-b - back a node')
+        self.hpad_lines.append('w,a,s,d - scroll directions')
+        self.hpad_max_y = len(self.hpad_lines)
+        self.hpad_max_x = 0
+        for line in self.hpad_lines:
+            self.hpad_max_x = max(len(line), self.hpad_max_x)
+
     def add_node(self, name):
         if len(self._nodes.keys()) == 0:
             self.name = name
@@ -506,6 +526,7 @@ class TermDAG(object):
         self.height, self.width = stdscr.getmaxyx()
         self.offset = self.height - self.gridsize[0] - 1
 
+
         self.pad_extent_y = self.height - 1 # lower left of pad winndow
         if self.gridsize[0] < self.height:
             self.pad_pos_y = self.height - self.gridsize[0] - 1 # upper left of pad window
@@ -547,15 +568,52 @@ class TermDAG(object):
         self.pad.refresh(self.pad_corner_y, self.pad_corner_x,
             self.pad_pos_y, self.pad_pos_x,
             self.pad_extent_y, self.pad_extent_x)
+        self.refresh_hpad()
+
+    def toggle_help(self, stdscr):
+        if self.hpad_collapsed:
+            self.expand_help()
+            self.refresh_hpad()
+        else:
+            self.collapse_help()
+            stdscr.clear()
+            self.refresh_hpad()
+            stdscr.refresh()
+            self.refresh_pad()
+
+    def collapse_help(self):
+        self.hpad.clear()
+        self.hpad_extent_x = len(self.hpad_default) + 1
+        self.hpad_extent_y = 2
+        self.hpad_pos_x = self.width - self.hpad_extent_x - 1
+        self.hpad_collapsed = True
+        self.hpad.addstr(0, 0, self.hpad_default)
+
+    def expand_help(self):
+        self.hpad.clear()
+        self.hpad_extent_y = self.hpad_max_y + 1
+        self.hpad_extent_x = self.hpad_max_x + 1
+        self.hpad_pos_x = self.width - self.hpad_extent_x - 1
+        self.hpad_collapsed = False
+        for i, line in enumerate(self.hpad_lines):
+            self.hpad.addstr(i, 0, line)
+
+    def refresh_hpad(self):
+        self.hpad.refresh(self.hpad_corner_y, self.hpad_corner_x,
+            self.hpad_pos_y, self.hpad_pos_x,
+            self.hpad_pos_y + self.hpad_extent_y,
+            self.hpad_pos_x + self.hpad_extent_x)
 
 
     def print_interactive(self, stdscr, has_colors = False):
         self.pad = curses.newpad(self.gridsize[0] + 1, self.gridsize[1] + 1)
-        self.pad.addstr(0, 0, str(self.gridsize))
         self.pad_corner_y = 0 # upper left position inside pad
         self.pad_corner_x = 0 # position shown in the pad
 
+        self.hpad = curses.newpad(self.hpad_max_y + 1, self.hpad_max_x + 1)
+
         self.resize(stdscr)
+
 
         if self.debug:
             stdscr.move(0, 0)
@@ -575,6 +633,7 @@ class TermDAG(object):
 
         # Draw initial grid and initialize colors to default
         self.redraw_default(stdscr, self.offset)
+        self.collapse_help()
         stdscr.move(self.height - 1, 0)
         stdscr.refresh()
         self.refresh_pad()
@@ -603,6 +662,9 @@ class TermDAG(object):
                     command = ch
                     stdscr.addstr(ch)
                     stdscr.refresh()
+
+                elif ch == ord('h'):
+                    self.toggle_help(stdscr)
 
                 # Scroll (TODO: Trackpad scroll)
                 elif ch == ord('w'):

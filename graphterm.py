@@ -42,7 +42,7 @@ class TermDAG(object):
         self.offset = 0
 
         self.hpad = None # Help Pad
-        self.hpad_default = 'h - toggle help'
+        self.hpad_default = ' h - toggle help        '
         self.hpad_pos_x = 0
         self.hpad_pos_y = 0
         self.hpad_extent_x = len(self.hpad_default)
@@ -52,10 +52,10 @@ class TermDAG(object):
         self.hpad_collapsed = True
         self.hpad_lines = []
         self.hpad_lines.append('      ' + self.hpad_default)
-        self.hpad_lines.append('   /foo - highlight node foo')
-        self.hpad_lines.append(' ctrl-w - advance node')
-        self.hpad_lines.append(' ctrl-b - back a node')
-        self.hpad_lines.append('w,a,s,d - scroll directions')
+        self.hpad_lines.append('    /foo - highlight node foo ')
+        self.hpad_lines.append('  ctrl-w - advance node       ')
+        self.hpad_lines.append('  ctrl-b - back a node        ')
+        self.hpad_lines.append(' w,a,s,d - scroll directions  ')
         self.hpad_max_y = len(self.hpad_lines)
         self.hpad_max_x = 0
         for line in self.hpad_lines:
@@ -587,7 +587,7 @@ class TermDAG(object):
         self.hpad_extent_y = 2
         self.hpad_pos_x = self.width - self.hpad_extent_x - 1
         self.hpad_collapsed = True
-        self.hpad.addstr(0, 0, self.hpad_default)
+        self.hpad.addstr(0, 0, self.hpad_default, curses.A_REVERSE)
 
     def expand_help(self):
         self.hpad.clear()
@@ -596,7 +596,7 @@ class TermDAG(object):
         self.hpad_pos_x = self.width - self.hpad_extent_x - 1
         self.hpad_collapsed = False
         for i, line in enumerate(self.hpad_lines):
-            self.hpad.addstr(i, 0, line)
+            self.hpad.addstr(i, 0, line, curses.A_REVERSE)
 
     def refresh_hpad(self):
         self.hpad.refresh(self.hpad_corner_y, self.hpad_corner_x,
@@ -634,9 +634,10 @@ class TermDAG(object):
         # Draw initial grid and initialize colors to default
         self.redraw_default(stdscr, self.offset)
         self.collapse_help()
-        stdscr.move(self.height - 1, 0)
         stdscr.refresh()
         self.refresh_pad()
+        self.refresh_hpad()
+        stdscr.move(self.height - 1, 0)
 
         command = ''
         selected = ''
@@ -665,6 +666,7 @@ class TermDAG(object):
 
                 elif ch == ord('h'):
                     self.toggle_help(stdscr)
+                    stdscr.move(self.height - 1, 0)
 
                 # Scroll (TODO: Trackpad scroll)
                 elif ch == ord('w'):

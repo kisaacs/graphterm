@@ -1442,6 +1442,7 @@ class TermNode(object):
         self.name = node_id
         self._in_links = list()
         self._out_links = list()
+        self.rank = -1 # Int
         self._x = -1  # Real
         self._y = -1  # Real
         self._col = 0 # Int
@@ -1458,17 +1459,274 @@ class TermNode(object):
     def add_out_link(self, link):
         self._out_links.append(link)
 
+    def skeleton_copy(self):
+        cpy = TermNode(self.name, None, self.real)
+        for link in self._in_links():
+            cpy.add_in_link(link)
+        for link in self._out_links():
+            cpy.add_out_link(link)
+        return cpy
 
 class TermLink(object):
 
-    def __init__(self, link_id, source, sink, tlp):
+    def __init__(self, link_id, source_id, sink_id, tlp):
         self.id = link_id
-        self.source = source
-        self.sink = sink
+        self.source = source_id
+        self.sink = sink_id
         self.tulipLink = tlp
         self._coords = None
 
         self.segments = []
+
+    def skeleton_copy(self):
+        return TermLink(self.id, self.source, self.sink, None)
+
+class TermLayout(object):
+
+    def __init__(self, graph, sweeps = 4):
+        self.original = graph
+        self.valid = False
+        self.err = ""
+        self.single_source_tree = False
+
+        self._nodes = dict()
+        self._links = list()
+        for name, node in graph._nodes():
+            self._nodes[name] = node.skeleton_copy()
+
+        for link in graph._links():
+            self._links.append(link.skeleton_copy)
+
+
+        self.grid = []
+        self.num_sweeps = sweeps
+
+    def is_valid(self):
+        return valid
+
+
+    def layout(self):
+        # Check for cycles -- error if not a DAG
+        if self.has_cycles():
+            self.valid = False
+            self.err = "ERROR: Graph is not a DAG."
+            return
+
+        # Ensure single source
+        source_node = self.create_single_source()
+
+        # Set Ranks
+        maxRank = self.setRanks()
+        for i in range(maxRank):
+            self.grid.append([])
+
+        # Ensure each link spans exactly one rank
+        if not self.single_source_tree:
+            self.makeProper(source_node)
+
+        embedding = dict()
+
+        # Divide nodes by rank into grid
+        for node in self._nodes.values():
+            self.grid[node.rank].append(node)
+
+        # Reorder in rank
+        if not self.single_source_tree:
+            self.reduceCrossings(source_node, embedding)
+            # TODO: Set Edge Order ? 
+
+            self.createSpanningTree()
+
+        # Apply Tree algorithm
+
+        # Do Edge Bends
+
+        # Do self-loops? or disallow them?
+
+        # Adjust edge/node overlap
+
+        # Post-process to algin nodes
+
+    def createSpanningTree(self, embedding):
+        for node in self._nodes:
+            node._in_links = sorted(node._in_links, lambda x : embedding[link.source])
+            half = len(node._in_links) / 2
+            for link in node._in_links[:half]:
+                self._nodes[link.source]._out_links.remove(link)
+            node._in_links = node._in_links[half:]
+
+
+    def reduceCrossings(self, source, embedding):
+        visited = dict()
+
+        # Add temporary sink and set visited
+        sink = TermNode('sink', None, False)
+        self._nodes['sink'] = sink
+        tmpSinkLinks = list()
+        for node in self._nodes.values():
+            visited[node.name] = False
+            if not node._out_links:
+                sinkLink = TermLink(node.name + '-sink', node.name, 'sink')
+                self._links.append(sinkLink)
+                node.add_out_link(sinkLink)
+                sink.add_in_link(sinkLink)
+                tmpSinkLinks.append(sinkLink)
+        self.grid.append([])
+        self.grid[-1].append(sink)
+
+        # Initial heuristic for row order 
+        # I'm not sure this actually does anything so skipping this for now
+        # and instad going with actual order
+        #self.setInitialCrossing(source, visited, embedding, 1)
+        #for row in self.grid:
+        #    sortedRow = sorted(row, lambda x : embedding[x.name])
+        #    for i, node in enumerate(sortedRow):
+        #        embedding[node.name] = i
+        for row in self.grid:
+            for i, node in enumerate(row):
+                embedding[node.name] = i
+
+        maxRank = len(self.grid) - 1
+        for q in range(self.num_sweeps):
+            # Up Sweep
+            for i in range(maxRank - 1, -1, -1):
+                reduceTwoLayerCrossings(embedding, i, True)
+
+            # Down Sweep
+            for i in range(maxDepth):
+                reduceTwoLayerCrossings(embedding, i, False)
+
+        del self._nodes[sink]
+        for link in tmpSinkLinks:
+            self._nodes[link.sink]._out_links.remove(link)
+            self._links.remove(link)
+
+
+    def reduceTwoLayerCrossings(self, embedding, layer, isUp):
+        # In Auber this appears to just compute based on both fixed layers at
+        # the same time. I have left it the same.
+        row = self.grid[layer]
+        for node in row:
+            mySum = embedding[node.name]
+            degree = len(node._out_links) + len(node._in_links)
+            for link in node._out_links:
+                mySum += embedding[link.sink]
+            for link in node._in_links:
+                mySum += embedding[link.source]
+            embedding[node.name] = mySum / float(degree + 1.0)
+
+
+    def setInitialCrossing(self, node, visited, embedding, i):
+        if visited[node.name]:
+            return
+
+        visited[node.name] = True
+        embedding[node.name] = i
+        for link in node._out_links:
+            sink = self._nodes[link.sink]
+            self.setInitialCrossing(sink, visited, embedding, i+1)
+
+
+    def setRanks(self, source):
+        source.rank = 0
+        current = collections.deque([source])
+        marks = dict()
+        maxRank = 0
+
+        while current:
+            node = current.popleft()
+            nextrank = node.rank + 1
+            for link in node._out_links():
+                neighbor = self._nodes[link.sink]
+                if link.sink not in marks:
+                    marks[link.sink] = len(neighbor._in_links)
+                marks[link.sink] -= 1
+                if marks[link.sink] == 0:
+                    neighbor.rank = nextrank
+                    if nextrank > maxRank:
+                        maxRank = nextrank
+                    current.append(neighbor)
+
+        return maxRank
+
+    def makeProper(self, source):
+        # Add dummy nodes
+        # Note that this fixes an issue in Auber's makeProperDag which adds
+        # at most two dummy nodes rather than one at every level.
+        for link in self._links:
+            start = self._nodes[link.source]
+            end = self._nodes[link.sink]
+            startRank = start.rank
+            endRank = end.rank
+
+            end._in_links.remove(link)
+
+            atRank = startRank + 1
+            lastLink = link
+            while atRank < endRank:
+                newName = start.name + '-' + str(atRank)
+                newNode = TermNode(newName, None, False)
+                newNode.rank = atRank
+                self._nodes[newName] = newNode
+
+                lastLink.sink = newName
+                newNode.add_in_link(lastLink)
+                newLink = TermLink(link.name + '-' + str(atRank), newName, end.name)
+                newNode.add_out_link(newLink)
+                lastLink = newLink
+
+            end.add_in_link(lastLink)
+
+
+    def create_single_source(self):
+        sources = list()
+        for node in self._nodes.values():
+            if not node._in_links:
+                sources.append(nodes)
+
+
+        if len(sources) == 1:
+            return sources[0]
+        else:
+            source = TermNode('source', None, False)
+            self._nodes['source'] = source
+            for i, node in enumerate(sources):
+                link = TermLink('source-' + str(i), 'source', node.name, None)
+                source.add_out_link(link)
+                node.add_in_link(link)
+                self._links.append(link)
+            return source
+
+    def has_cycles(self):
+        seen = set()
+        stack = set()
+        self.tree = True
+        for node in self._nodes.values():
+            if not node._in_links:
+                if self.cycles_from(node, seen, stack):
+                    return True
+
+        return False
+
+    def cycles_from(self, node, seen, stack):
+        seen.add(node.name)
+        stack.add(node.name)
+
+        if node.name not in seen:
+            for link in node._out_links:
+                sink = self._nodes[link.sink]
+                if link.sink not in seen:
+                    if self.cycles_from(sink, seen, stack):
+                        return True
+                elif link.sink in stack:
+                    # Each node should have been seen only once if there
+                    # is a single source. Otherwise when we add a single
+                    # source, it will no longer be a tree.
+                    self.single_source_tree = False
+                    return True
+
+        stack.remove(node.name)
+        return False
 
 
 def interactive_helper(stdscr, graph):

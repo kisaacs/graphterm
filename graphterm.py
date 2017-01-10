@@ -43,28 +43,46 @@ class TermDAG(object):
         self.width = 0
         self.offset = 0
 
-        # TODO, make help calculate padding automatically. I will need
-        # to break it into commands and messages
+        self.initialize_help()
+
+
+    def initialize_help(self):
         self.hpad = None # Help Pad
-        self.hpad_default = ' h - toggle help           '
+        self.hpad_default_cmd = 'h'
+        self.hpad_default_msg = 'toggle help'
         self.hpad_pos_x = 0
         self.hpad_pos_y = 0
-        self.hpad_extent_x = len(self.hpad_default)
+        self.hpad_extent_x = len(self.hpad_default_cmd) + len(self.hpad_default_msg) + 5
         self.hpad_extent_y = 2
         self.hpad_corner_x = 0
         self.hpad_corner_y = 0
         self.hpad_collapsed = True
-        self.hpad_lines = []
-        self.hpad_lines.append('      ' + self.hpad_default)
-        self.hpad_lines.append('    /foo - highlight node foo    ')
-        self.hpad_lines.append('  ctrl-v - change highlight mode ')
-        self.hpad_lines.append('  ctrl-w - advance node          ')
-        self.hpad_lines.append('  ctrl-b - back a node           ')
-        self.hpad_lines.append(' w,a,s,d - scroll directions     ')
-        self.hpad_max_y = len(self.hpad_lines)
-        self.hpad_max_x = 0
-        for line in self.hpad_lines:
-            self.hpad_max_x = max(len(line), self.hpad_max_x)
+
+        self.hpad_cmds = []
+        self.hpad_msgs = []
+        self.hpad_cmds.append(self.hpad_default_cmd)
+        self.hpad_cmds.append('/foo')
+        self.hpad_cmds.append('ctrl-v')
+        self.hpad_cmds.append('ctrl-w')
+        self.hpad_cmds.append('ctrl-b')
+        self.hpad_cmds.append('w,a,s,d')
+        self.hpad_msgs.append(self.hpad_default_msg)
+        self.hpad_msgs.append('highlight node foo')
+        self.hpad_msgs.append('change highlight mode')
+        self.hpad_msgs.append('advance node')
+        self.hpad_msgs.append('back a node')
+        self.hpad_msgs.append('scroll directions')
+
+        self.hpad_max_y = len(self.hpad_cmds)
+        self.hpad_max_cmd = 0
+        self.hpad_max_msg = 0
+        for i in range(len(self.hpad_cmds)):
+            self.hpad_max_cmd = max(len(self.hpad_cmds[i]), self.hpad_max_cmd)
+            self.hpad_max_msg = max(len(self.hpad_msgs[i]), self.hpad_max_msg)
+
+        # The 2 is for the prefix an suffix space
+        self.hpad_max_x = self.hpad_max_cmd + self.hpad_max_msg + len(' - ') + 2
+
 
     def add_node(self, name):
         if len(self._nodes.keys()) == 0:
@@ -588,11 +606,14 @@ class TermDAG(object):
 
     def collapse_help(self):
         self.hpad.clear()
-        self.hpad_extent_x = len(self.hpad_default) + 1
+        self.hpad_extent_x = self.hpad_max_x + 1
         self.hpad_extent_y = 2
         self.hpad_pos_x = self.width - self.hpad_extent_x - 1
         self.hpad_collapsed = True
-        self.hpad.addstr(0, 0, self.hpad_default, curses.A_REVERSE)
+        helpline = self.make_hpad_string(self.hpad_default_cmd, self.hpad_default_msg,
+            len(self.hpad_default_cmd), len(self.hpad_default_msg))
+        self.hpad.addstr(0, self.hpad_max_cmd - len(self.hpad_default_cmd),
+            helpline, curses.A_REVERSE)
 
     def expand_help(self):
         self.hpad.clear()
@@ -600,8 +621,23 @@ class TermDAG(object):
         self.hpad_extent_x = self.hpad_max_x + 1
         self.hpad_pos_x = self.width - self.hpad_extent_x - 1
         self.hpad_collapsed = False
-        for i, line in enumerate(self.hpad_lines):
-            self.hpad.addstr(i, 0, line, curses.A_REVERSE)
+        for i in range(len(self.hpad_cmds)): # TODO: Use zip
+            helpline = self.make_hpad_string(self.hpad_cmds[i], self.hpad_msgs[i],
+                self.hpad_max_cmd, self.hpad_max_msg)
+            self.hpad.addstr(i, 0, helpline, curses.A_REVERSE)
+
+
+    def make_hpad_string(self, cmd, msg, cmd_length, msg_length):
+        string = ' '
+        cmd_padding = cmd_length - len(cmd)
+        msg_padding = msg_length - len(msg)
+        string += ' ' * cmd_padding
+        string += cmd
+        string += ' - '
+        string += msg
+        string += ' ' * msg_padding
+        string += ' '
+        return string
 
     def refresh_hpad(self):
         self.hpad.refresh(self.hpad_corner_y, self.hpad_corner_x,

@@ -1616,12 +1616,11 @@ class TermLayout(object):
         # Post-process to algin nodes
 
     def createSpanningTree(self, embedding):
+        # Only keeps the middle edge
         for node in self._nodes:
             node._in_links = sorted(node._in_links, lambda x : embedding[link.source])
             half = len(node._in_links) / 2
-            for link in node._in_links[:half]:
-                self._nodes[link.source]._out_links.remove(link)
-            node._in_links = node._in_links[half:]
+            node._in_links = [ node._in_links[half] ]
 
 
     def reduceCrossings(self, source, embedding):

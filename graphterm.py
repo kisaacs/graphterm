@@ -30,6 +30,8 @@ class TermDAG(object):
         self.output_tulip = True
         self.name = 'default'
 
+        self.highlight_full_connectivity = False
+
         self.pad = None
         self.pad_pos_x = 0
         self.pad_pos_y = 0
@@ -41,8 +43,10 @@ class TermDAG(object):
         self.width = 0
         self.offset = 0
 
+        # TODO, make help calculate padding automatically. I will need
+        # to break it into commands and messages
         self.hpad = None # Help Pad
-        self.hpad_default = ' h - toggle help        '
+        self.hpad_default = ' h - toggle help           '
         self.hpad_pos_x = 0
         self.hpad_pos_y = 0
         self.hpad_extent_x = len(self.hpad_default)
@@ -52,10 +56,11 @@ class TermDAG(object):
         self.hpad_collapsed = True
         self.hpad_lines = []
         self.hpad_lines.append('      ' + self.hpad_default)
-        self.hpad_lines.append('    /foo - highlight node foo ')
-        self.hpad_lines.append('  ctrl-w - advance node       ')
-        self.hpad_lines.append('  ctrl-b - back a node        ')
-        self.hpad_lines.append(' w,a,s,d - scroll directions  ')
+        self.hpad_lines.append('    /foo - highlight node foo    ')
+        self.hpad_lines.append('  ctrl-v - change highlight mode ')
+        self.hpad_lines.append('  ctrl-w - advance node          ')
+        self.hpad_lines.append('  ctrl-b - back a node           ')
+        self.hpad_lines.append(' w,a,s,d - scroll directions     ')
         self.hpad_max_y = len(self.hpad_lines)
         self.hpad_max_x = 0
         for line in self.hpad_lines:
@@ -698,23 +703,32 @@ class TermDAG(object):
                             self.refresh_pad()
                             stdscr.move(self.height - 1, 0)
                             stdscr.refresh()
-                        elif (ch[1] == 'w' or ch[1] == 'W'):
-                            if selected:
-                                selected = self.node_order[(1 + self._nodes[selected].order)
-                                    % len(self.node_order)].name
-                            else:
-                                selected = self.node_order[0].name
-
-                            self.select_node(stdscr, selected, self.offset)
-                            self.refresh_pad()
-                            stdscr.move(self.height - 1, 0)
-                            stdscr.refresh()
                         elif (ch[1] == 'b' or ch[1] == 'B'):
                             if selected:
                                 selected = self.node_order[(-1 + self._nodes[selected].order)
                                     % len(self.node_order)].name
                             else:
                                 selected = self.node_order[-1].name
+
+                            self.select_node(stdscr, selected, self.offset)
+                            self.refresh_pad()
+                            stdscr.move(self.height - 1, 0)
+                            stdscr.refresh()
+                        elif (ch[1] == 'v' or ch[1] == 'V'):
+                            self.highlight_full_connectivity = not self.highlight_full_connectivity
+                            if selected:
+                                self.redraw_default(stdscr, self.offset)
+                                self.select_node(stdscr, selected, self.offset)
+                                self.highlight_neighbors(stdscr, selected, self.offset)
+                                self.refresh_pad()
+                                stdscr.move(self.height - 1, 0)
+                                stdscr.refresh()
+                        elif (ch[1] == 'w' or ch[1] == 'W'):
+                            if selected:
+                                selected = self.node_order[(1 + self._nodes[selected].order)
+                                    % len(self.node_order)].name
+                            else:
+                                selected = self.node_order[0].name
 
                             self.select_node(stdscr, selected, self.offset)
                             self.refresh_pad()
@@ -766,15 +780,33 @@ class TermDAG(object):
 
         node = self._nodes[name]
 
+        self.highlight_in_neighbors(stdscr, name, offset, self.highlight_full_connectivity)
+        self.highlight_out_neighbors(stdscr, name, offset, self.highlight_full_connectivity)
+
+
+    def highlight_in_neighbors(self, stdscr, name, offset, recurse):
+        node = self._nodes[name]
+
         for link in node._in_links:
             neighbor = self._nodes[link.source]
             self.highlight_node(stdscr, neighbor.name, offset, 5)
             self.highlight_segments(stdscr, link.segments, offset)
 
+            if recurse:
+                self.highlight_in_neighbors(stdscr, link.source, offset, recurse)
+
+
+    def highlight_out_neighbors(self, stdscr, name, offset, recurse):
+        node = self._nodes[name]
+
         for link in node._out_links:
             neighbor = self._nodes[link.sink]
             self.highlight_node(stdscr, neighbor.name, offset, 5)
             self.highlight_segments(stdscr, link.segments, offset)
+
+            if recurse:
+                self.highlight_out_neighbors(stdscr, link.sink, offset, recurse)
+
 
     def highlight_segments(self, stdscr, segments, offset):
         for segment in segments:

@@ -1572,6 +1572,167 @@ class TermLayout(object):
     def is_valid(self):
         return valid
 
+    def RTE(self, source, rankSizes):
+        # Reingold-Tilford Extended
+        # rankSizes is a dict[rank] = size (the latter being a double)
+        relativePosition = dict() # node -> double
+
+        # TreePlace -- figure out LR tree extents, put placements in
+        # relativePosition
+        self.treePlace(source, relativePosition)
+
+        # Calc Layout -- convert relativePosition into coords
+        self.calcLayout(source, relativePosition, 0, 0, 0, rankSizes)
+
+        # Ortho is true -- do edge bends -- not sure this makes sense in our
+        # case 
+        for link in self._links:
+            source = self._nodes[link.source]
+            sink = self._nodes[link.sink]
+            sourcePos = source.coord
+            sinkPos = sink.coord
+
+            tmp = []
+            if sourcePos[0] != sinkPos[0]:
+                tmp.append((sinkPos[0], sourcePos[1]))
+                link.coords = tmp
+
+
+    def calcLayout(node, relativePosition, x, y, rank, rankSizes):
+        node.coord = (x + relativePosition[node], -1 * (y + rankSizes[rank]/2.0))
+        for link in node._out_links:
+            out = self._nodes[link.sink]
+            self.calcLayout(out, x + relativePosition[out], y + self.spacing,
+                rank + 1, rankSizes)
+
+
+    def treePlace(self, node, relativePosition):
+        if len(node._out_links) == 0:
+            relativePosition[node] = 0
+            return [(-0.5, 0.5, 1)] # Triple L, R, size
+
+        childPos = []
+        leftTree = treePlace(self._nodes[node._out_links[0].sink], relativePosition)
+        childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
+
+        for link in node._out_links[1:]:
+            rightTree = treePlace(self._nodes[link.sink], relativePosition)
+            decal = calcDecal(leftTree, rightTree)
+            tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
+
+            if mergeLR(leftTree, rightTree, decal) == leftTree:
+                childPos.append(tempLeft + decal)
+                rightTree = []
+            else:
+                for i, pos in enumerate(chlidPos):
+                    childPos[i] = pos - decal
+                childPos.append(tempLeft)
+                leftTree = rightTree
+
+
+        posFather = (leftTree[0][0] + leftTree[0][1]) / 2.0
+        leftTree.prepend((posFather - 0.5, postFather + 0.5, 1))
+        for i, link in node._out_links:
+            relativePosition[self._nodes[link.sink]] = childPos[i] - posFather
+        relativePosition[node] = 0
+        return leftTree
+
+
+    def mergeLR(self, left, right, decal):
+        iL = 0
+        iR = 0
+        itL = 0
+        itR = 0
+
+        while itL != len(left) and itR != len(right):
+            minSize = min(left[itL][2] - iL, right[itR][2] - iR)
+            tmp = (left[itL][0], right[itR][1] + decal, minSize)
+
+
+            if left[itL][2] == 1:
+                left[itL] = tmp
+            else:
+                if iL == 0:
+                    if iL + minSize >= left[itL][2]:
+                        left[itL] = tmp
+                    else:
+                        left.insert(itL, tmp)
+                        left[itL][2] -= minSize
+                        iL = -1 * minSize
+                else:
+                    if iL + minSize >= left[itL][2]: # end
+                        left[itL][2] -= minSize
+                        itL += 1
+                        left.insert(itL, tmp)
+                        iL = -1 * minSize
+                    else: # middle
+                        tmp2 = left[itL]
+                        left[itL][2] = iL
+                        itL += 1
+                        left.insert(itL, tmp)
+                        tmp2[2] -= iL + minSize
+                        left.insert(itL, tmp2)
+                        itL -= 1
+                        iL = -1 * minSize
+
+
+            iL += minSize
+            iR += minSize
+
+            if iL > left[itL][2]:
+                itL += 1
+                iL = 0
+            if iR > right[itR][2]:
+                itR += 1
+                iR = 0
+
+        if itL != len(left) and iL != 0:
+            tmp = (left[itL][0], left[itL][1], left[itL][2] - iL)
+            itL += 1
+
+        if itR != len(right) and iR != 0:
+            tmp (right[itR][0] + decal, right[itR][1] + decal, right[itR][2] - iR)
+            left.append(tmp)
+            itR += 1
+
+            while itR < len(right):
+                tmp = (right[itR][0] + decal, right[itR][1] + decal, right[itR][2])
+                left.append(tmp)
+
+        return left
+
+
+    def calcDecal(self, leftTree, rightTree):
+        iL = 0
+        iR = 0
+        decal = leftTree[iL][1] - rightTree[iR][0]
+        minSize = min(leftTree[iL][2], rightTree[iR][0])
+        sL = minSize
+        sR = minSize
+
+        if sL == leftTree[iL][2]:
+            iL += 1
+            sL = 0
+        if sR == rightTree[0][2]:
+            iR += 1
+            sR = 0
+
+        while iL < len(leftTree) and iR < len(rightTree):
+            decal = max(decal, leftTree[iL][1] - rightTree[iR][0])
+            minSize = min(leftTree[iL][2] - sL, rightTree[iR][2] - sR)
+            sL += minSize
+            sR += minSize
+
+            if sL == leftTree[iL][2]:
+                iL += 1
+                sL = 0
+
+            if sR == rightTree[iR][2]:
+                iR += 1
+                sR = 0
+
+        return decal + self.nodeSpacing
+
 
     def layout(self):
         # Check for cycles -- error if not a DAG

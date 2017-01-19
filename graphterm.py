@@ -20,13 +20,10 @@ class TermDAG(object):
         self.row_max = 0
         self.row_names = dict()
 
-        self.RIGHT = 0
-        self.DOWN_RIGHT = 1
-        self.DOWN_LEFT = 2
-        self.LEFT = 3
+        self.TL = None
 
         self.layout = False
-        self.debug = False
+        self.debug = True
         self.output_tulip = True
         self.name = 'default'
 
@@ -115,6 +112,9 @@ class TermDAG(object):
         return self.layout_hierarchical()
 
     def layout_hierarchical(self):
+        self.TL = TermLayout(self)
+        self.TL.layout()
+
         viewLabel = self._tulip.getStringProperty('viewLabel')
         for node in self._nodes.values():
             viewLabel[node.tulipNode] = node.name
@@ -899,9 +899,13 @@ class TermDAG(object):
     def write_tulip_positions(self):
         for node in self._nodes.values():
             print node.name, node._x, node._y
+            if self.TL and self.TL.is_valid():
+                print "TL: ", self.TL.get_node_coord(node.name)
 
         for link in self._links:
             print link.source, link.sink, link._coords
+            if self.TL and self.TL.is_valid():
+                print "TL: ", self.TL.get_node_coord(link.id)
 
     def to_dot_object(self):
         dot = gv.digraph('term')
@@ -1529,10 +1533,10 @@ class TermNode(object):
 
     def skeleton_copy(self):
         cpy = TermNode(self.name, None, self.real)
-        for link in self._in_links():
-            cpy.add_in_link(link)
-        for link in self._out_links():
-            cpy.add_out_link(link)
+        for link in self._in_links:
+            cpy.add_in_link(link.id)
+        for link in self._out_links:
+            cpy.add_out_link(link.id)
         return cpy
 
 class TermLink(object):
@@ -1559,18 +1563,32 @@ class TermLayout(object):
 
         self._nodes = dict()
         self._links = list()
-        for name, node in graph._nodes():
+        self._link_dict = dict()
+        self._original_links = list()
+        for name, node in graph._nodes.items():
             self._nodes[name] = node.skeleton_copy()
 
-        for link in graph._links():
-            self._links.append(link.skeleton_copy)
+        for link in graph._links:
+            skeleton = link.skeleton_copy()
+            self._links.append(skeleton)
+            self._original_links.append(skeleton)
+            self._link_dict[link.id] = skeleton
 
 
         self.grid = []
         self.num_sweeps = sweeps
+        self.spacing = 5.0
+        self.node_spacing = 5.0
+
 
     def is_valid(self):
-        return valid
+        return self.valid
+
+    def get_node_coord(self, name):
+        return self._nodes[name].coord
+
+    def get_link_segments(self, name):
+        return self._link_dict[name].segments
 
     def RTE(self, source, rankSizes):
         # Reingold-Tilford Extended
@@ -1600,7 +1618,8 @@ class TermLayout(object):
 
     def calcLayout(node, relativePosition, x, y, rank, rankSizes):
         node.coord = (x + relativePosition[node], -1 * (y + rankSizes[rank]/2.0))
-        for link in node._out_links:
+        for linkid in node._out_links:
+            link = self._link_dict[linkid]
             out = self._nodes[link.sink]
             self.calcLayout(out, x + relativePosition[out], y + self.spacing,
                 rank + 1, rankSizes)
@@ -1612,10 +1631,11 @@ class TermLayout(object):
             return [(-0.5, 0.5, 1)] # Triple L, R, size
 
         childPos = []
-        leftTree = treePlace(self._nodes[node._out_links[0].sink], relativePosition)
+        leftTree = treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition)
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
-        for link in node._out_links[1:]:
+        for linkid in node._out_links[1:]:
+            link = self._link_dict[linkid]
             rightTree = treePlace(self._nodes[link.sink], relativePosition)
             decal = calcDecal(leftTree, rightTree)
             tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
@@ -1632,7 +1652,8 @@ class TermLayout(object):
 
         posFather = (leftTree[0][0] + leftTree[0][1]) / 2.0
         leftTree.prepend((posFather - 0.5, postFather + 0.5, 1))
-        for i, link in node._out_links:
+        for i, linkid in node._out_links:
+            link = self._link_dict[linkid]
             relativePosition[self._nodes[link.sink]] = childPos[i] - posFather
         relativePosition[node] = 0
         return leftTree
@@ -1745,8 +1766,8 @@ class TermLayout(object):
         source_node = self.create_single_source()
 
         # Set Ranks
-        maxRank = self.setRanks()
-        for i in range(maxRank):
+        maxRank = self.setRanks(source_node)
+        for i in range(maxRank + 1):
             self.grid.append([])
 
         # Ensure each link spans exactly one rank
@@ -1755,9 +1776,11 @@ class TermLayout(object):
 
         embedding = dict()
 
+
         # Divide nodes by rank into grid
         for node in self._nodes.values():
             self.grid[node.rank].append(node)
+
 
         # Reorder in rank
         if not self.single_source_tree:
@@ -1767,22 +1790,49 @@ class TermLayout(object):
             self.createSpanningTree()
 
         # Apply Tree algorithm
+        rankSizes = []
+        for row in self.grid:
+            rankSizes.append(len(row))
+        self.RTE(source_node, self.grid)
 
         # Do Edge Bends
+        self.computeEdgeBends()
 
-        # Do self-loops? or disallow them?
+        # We disallow self loops, so nothing to do here
 
-        # Adjust edge/node overlap
+        # Adjust edge/node overlap -- skip for now
+        # maxLayerSize = [1 for x in range(maxRank)]
+        # offset = 0.5 + self.spacing/4.0
+        # for link in self._original_links:
+        #    source = self._nodes[link.source]
+        #    sink = self._nodes[link.sink]
+        #    if not link.segments:
+        #        source.coord[1] += offset
+        #        sink.coord[1] -= offset
+        #    else:
 
-        # Post-process to algin nodes
+
+        # Post-process to align nodes -- also skip for now
+        #
+        self.valid = True
 
     def createSpanningTree(self, embedding):
         # Only keeps the middle edge
         for node in self._nodes:
-            node._in_links = sorted(node._in_links, lambda x : embedding[link.source])
+            node._in_links = sorted(node._in_links, lambda x : embedding[self._link_dict[x].source])
             half = len(node._in_links) / 2
             node._in_links = [ node._in_links[half] ]
 
+
+    def computeEdgeBends(self):
+        # We have no replaced edges, since we modified them. -- at least their
+        # ID is the same
+        # We have no reversed edges, because we only allow true DAGs
+        for link in self._original_links:
+            link.segments.append(self._nodes[link.source].coord)
+            link.segments.append(self._nodes[link.sink].coord)
+            for nextLink in link.children:
+                link.segments.append(self._nodes[nextLink.sink].coord)
 
     def reduceCrossings(self, source, embedding):
         visited = dict()
@@ -1794,7 +1844,7 @@ class TermLayout(object):
         for node in self._nodes.values():
             visited[node.name] = False
             if not node._out_links:
-                sinkLink = TermLink(node.name + '-sink', node.name, 'sink')
+                sinkLink = TermLink(node.name + '-sink', node.name, 'sink', None)
                 self._links.append(sinkLink)
                 node.add_out_link(sinkLink)
                 sink.add_in_link(sinkLink)
@@ -1818,15 +1868,15 @@ class TermLayout(object):
         for q in range(self.num_sweeps):
             # Up Sweep
             for i in range(maxRank - 1, -1, -1):
-                reduceTwoLayerCrossings(embedding, i, True)
+                self.reduceTwoLayerCrossings(embedding, i, True)
 
             # Down Sweep
             for i in range(maxDepth):
-                reduceTwoLayerCrossings(embedding, i, False)
+                self.reduceTwoLayerCrossings(embedding, i, False)
 
         del self._nodes[sink]
         for link in tmpSinkLinks:
-            self._nodes[link.sink]._out_links.remove(link)
+            self._nodes[link.sink]._out_links.remove(link.id)
             self._links.remove(link)
 
 
@@ -1837,10 +1887,10 @@ class TermLayout(object):
         for node in row:
             mySum = embedding[node.name]
             degree = len(node._out_links) + len(node._in_links)
-            for link in node._out_links:
-                mySum += embedding[link.sink]
-            for link in node._in_links:
-                mySum += embedding[link.source]
+            for linkid in node._out_links:
+                mySum += embedding[self._link_dict[linkid].sink]
+            for linkid in node._in_links:
+                mySum += embedding[self._link_dict[linkid].source]
             embedding[node.name] = mySum / float(degree + 1.0)
 
 
@@ -1850,12 +1900,13 @@ class TermLayout(object):
 
         visited[node.name] = True
         embedding[node.name] = i
-        for link in node._out_links:
-            sink = self._nodes[link.sink]
+        for linkid in node._out_links:
+            sink = self._nodes[self._link_dict[linkid].sink]
             self.setInitialCrossing(sink, visited, embedding, i+1)
 
 
     def setRanks(self, source):
+        import collections
         source.rank = 0
         current = collections.deque([source])
         marks = dict()
@@ -1864,7 +1915,8 @@ class TermLayout(object):
         while current:
             node = current.popleft()
             nextrank = node.rank + 1
-            for link in node._out_links():
+            for linkid in node._out_links:
+                link = self._link_dict[linkid]
                 neighbor = self._nodes[link.sink]
                 if link.sink not in marks:
                     marks[link.sink] = len(neighbor._in_links)
@@ -1882,12 +1934,13 @@ class TermLayout(object):
         # Note that this fixes an issue in Auber's makeProperDag which adds
         # at most two dummy nodes rather than one at every level.
         for link in self._links:
+            link.children = []
             start = self._nodes[link.source]
             end = self._nodes[link.sink]
             startRank = start.rank
             endRank = end.rank
 
-            end._in_links.remove(link)
+            end._in_links.remove(link.id)
 
             atRank = startRank + 1
             lastLink = link
@@ -1898,19 +1951,25 @@ class TermLayout(object):
                 self._nodes[newName] = newNode
 
                 lastLink.sink = newName
-                newNode.add_in_link(lastLink)
-                newLink = TermLink(link.name + '-' + str(atRank), newName, end.name)
-                newNode.add_out_link(newLink)
+                newNode.add_in_link(lastLink.id)
+                newLinkName = str(link.id) + '-' + str(atRank)
+                newLink = TermLink(newLinkName, newName, end.name, None)
+                newNode.add_out_link(newLink.id)
                 lastLink = newLink
+                link.children.append(newLink)
+                self._links.append(newLink)
+                self._link_dict[newLinkName] = newLink
+                atRank += 1
 
-            end.add_in_link(lastLink)
+            end.add_in_link(lastLink.id)
+
 
 
     def create_single_source(self):
         sources = list()
         for node in self._nodes.values():
             if not node._in_links:
-                sources.append(nodes)
+                sources.append(node)
 
 
         if len(sources) == 1:
@@ -1919,10 +1978,12 @@ class TermLayout(object):
             source = TermNode('source', None, False)
             self._nodes['source'] = source
             for i, node in enumerate(sources):
-                link = TermLink('source-' + str(i), 'source', node.name, None)
+                linkName = 'source-' + str(i)
+                link = TermLink(linkName, 'source', node.name, None)
                 source.add_out_link(link)
                 node.add_in_link(link)
                 self._links.append(link)
+                self._link_dict[linkName] = link
             return source
 
     def has_cycles(self):
@@ -1941,7 +2002,8 @@ class TermLayout(object):
         stack.add(node.name)
 
         if node.name not in seen:
-            for link in node._out_links:
+            for linkid in node._out_links:
+                link = self._link_dict[linkid]
                 sink = self._nodes[link.sink]
                 if link.sink not in seen:
                     if self.cycles_from(sink, seen, stack):
@@ -1964,3 +2026,4 @@ def interactive_helper(stdscr, graph):
     for i in range(0, curses.COLORS):
         curses.init_pair(i + 1, i, -1)
     graph.print_interactive(stdscr, can_color)
+    graph.write_tulip_positions()

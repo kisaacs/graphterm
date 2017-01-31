@@ -1839,7 +1839,6 @@ class TermLayout(object):
 
         # Add temporary sink and set visited
         sink = TermNode('sink', None, False)
-        self._nodes['sink'] = sink
         tmpSinkLinks = list()
         for node in self._nodes.values():
             visited[node.name] = False
@@ -1851,6 +1850,12 @@ class TermLayout(object):
                 sink.add_in_link(linkName)
                 tmpSinkLinks.append(sinkLink)
                 self._link_dict[linkName] = sinkLink
+
+        # Add sink to self._nodes after so we don't create a sink link to
+        # itself
+        self._nodes['sink'] = sink # Caution!! This will not work if there is a node named sink, please fix
+
+        # Setup grid
         self.grid.append([])
         self.grid[-1].append(sink)
 
@@ -1873,13 +1878,13 @@ class TermLayout(object):
                 self.reduceTwoLayerCrossings(embedding, i, True)
 
             # Down Sweep
-            for i in range(maxDepth):
+            for i in range(maxRank): # was 'maxDepth' -- not sure what I was thinking there
                 self.reduceTwoLayerCrossings(embedding, i, False)
 
-        del self._nodes[sink]
         for link in tmpSinkLinks:
-            self._nodes[link.sink]._out_links.remove(link.id)
+            self._nodes[link.source]._out_links.remove(link.id)
             self._links.remove(link)
+        del self._nodes[sink.name]
 
 
     def reduceTwoLayerCrossings(self, embedding, layer, isUp):

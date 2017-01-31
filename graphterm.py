@@ -905,7 +905,7 @@ class TermDAG(object):
         for link in self._links:
             print link.source, link.sink, link._coords
             if self.TL and self.TL.is_valid():
-                print "TL: ", self.TL.get_node_coord(link.id)
+                print "TL: ", self.TL.get_link_segments(link.id)
 
     def to_dot_object(self):
         dot = gv.digraph('term')

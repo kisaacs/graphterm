@@ -4,7 +4,7 @@ import curses
 import curses.ascii
 import gv
 from tulip import *
-
+import math
 
 class TermDAG(object):
 
@@ -1787,7 +1787,7 @@ class TermLayout(object):
             self.reduceCrossings(source_node, embedding)
             # TODO: Set Edge Order ? 
 
-            self.createSpanningTree()
+            self.createSpanningTree(embedding)
 
         # Apply Tree algorithm
         rankSizes = []
@@ -1818,10 +1818,11 @@ class TermLayout(object):
 
     def createSpanningTree(self, embedding):
         # Only keeps the middle edge
-        for node in self._nodes:
-            node._in_links = sorted(node._in_links, lambda x : embedding[self._link_dict[x].source])
-            half = len(node._in_links) / 2
-            node._in_links = [ node._in_links[half] ]
+        for name, node in self._nodes.items():
+            if len(node._in_links) > 1:
+                node._in_links = sorted(node._in_links, key = lambda x : embedding[self._link_dict[x].source])
+                half = int(math.floor(len(node._in_links) / 2))
+                node._in_links = [ node._in_links[half] ]
 
 
     def computeEdgeBends(self):

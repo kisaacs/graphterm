@@ -1620,11 +1620,13 @@ class TermLayout(object):
 
 
     def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
+        print 'rankSizes[rank] is', rankSizes[rank]
         node.coord = (x + relativePosition[node], -1 * (y + rankSizes[rank]/2.0))
         for linkid in node._out_links:
             link = self._link_dict[linkid]
             out = self._nodes[link.sink]
-            self.calcLayout(out, x + relativePosition[out], y + self.spacing,
+            self.calcLayout(out, relativePosition,
+                x + relativePosition[out], y + self.spacing,
                 rank + 1, rankSizes)
 
 
@@ -1817,7 +1819,7 @@ class TermLayout(object):
         for row in self.grid:
             rankSizes.append(len(row))
         print "RTE time... "
-        self.RTE(source_node, self.grid)
+        self.RTE(source_node, rankSizes) #self.grid)
         print "RTE clear."
 
         # Do Edge Bends

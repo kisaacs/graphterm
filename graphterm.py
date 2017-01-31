@@ -1844,11 +1844,13 @@ class TermLayout(object):
         for node in self._nodes.values():
             visited[node.name] = False
             if not node._out_links:
-                sinkLink = TermLink(node.name + '-sink', node.name, 'sink', None)
+                linkName = node.name + '-sink'
+                sinkLink = TermLink(linkName, node.name, 'sink', None)
                 self._links.append(sinkLink)
-                node.add_out_link(sinkLink)
-                sink.add_in_link(sinkLink)
+                node.add_out_link(linkName)
+                sink.add_in_link(linkName)
                 tmpSinkLinks.append(sinkLink)
+                self._link_dict[linkName] = sinkLink
         self.grid.append([])
         self.grid[-1].append(sink)
 
@@ -1980,8 +1982,8 @@ class TermLayout(object):
             for i, node in enumerate(sources):
                 linkName = 'source-' + str(i)
                 link = TermLink(linkName, 'source', node.name, None)
-                source.add_out_link(link)
-                node.add_in_link(link)
+                source.add_out_link(linkName)
+                node.add_in_link(linkName)
                 self._links.append(link)
                 self._link_dict[linkName] = link
             return source

@@ -1631,16 +1631,16 @@ class TermLayout(object):
             return [(-0.5, 0.5, 1)] # Triple L, R, size
 
         childPos = []
-        leftTree = treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition)
+        leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition)
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
         for linkid in node._out_links[1:]:
             link = self._link_dict[linkid]
-            rightTree = treePlace(self._nodes[link.sink], relativePosition)
-            decal = calcDecal(leftTree, rightTree)
+            rightTree = self.treePlace(self._nodes[link.sink], relativePosition)
+            decal = self.calcDecal(leftTree, rightTree)
             tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
 
-            if mergeLR(leftTree, rightTree, decal) == leftTree:
+            if self.mergeLR(leftTree, rightTree, decal) == leftTree:
                 childPos.append(tempLeft + decal)
                 rightTree = []
             else:
@@ -1651,8 +1651,8 @@ class TermLayout(object):
 
 
         posFather = (leftTree[0][0] + leftTree[0][1]) / 2.0
-        leftTree.prepend((posFather - 0.5, postFather + 0.5, 1))
-        for i, linkid in node._out_links:
+        leftTree.insert(0, (posFather - 0.5, posFather + 0.5, 1))
+        for i, linkid in enumerate(node._out_links):
             link = self._link_dict[linkid]
             relativePosition[self._nodes[link.sink]] = childPos[i] - posFather
         relativePosition[node] = 0
@@ -1712,7 +1712,7 @@ class TermLayout(object):
             itL += 1
 
         if itR != len(right) and iR != 0:
-            tmp (right[itR][0] + decal, right[itR][1] + decal, right[itR][2] - iR)
+            tmp = (right[itR][0] + decal, right[itR][1] + decal, right[itR][2] - iR)
             left.append(tmp)
             itR += 1
 
@@ -1752,7 +1752,7 @@ class TermLayout(object):
                 iR += 1
                 sR = 0
 
-        return decal + self.nodeSpacing
+        return decal + self.node_spacing
 
 
     def layout(self):

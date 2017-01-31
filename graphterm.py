@@ -1597,13 +1597,16 @@ class TermLayout(object):
 
         # TreePlace -- figure out LR tree extents, put placements in
         # relativePosition
+        print "Placing tree..."
         self.treePlace(source, relativePosition)
 
         # Calc Layout -- convert relativePosition into coords
+        print "Tree placed, calculating coords...."
         self.calcLayout(source, relativePosition, 0, 0, 0, rankSizes)
 
         # Ortho is true -- do edge bends -- not sure this makes sense in our
         # case 
+        print "Layout calc'd. Doing edge bends inside RTE..."
         for link in self._links:
             source = self._nodes[link.source]
             sink = self._nodes[link.sink]
@@ -1616,7 +1619,7 @@ class TermLayout(object):
                 link.coords = tmp
 
 
-    def calcLayout(node, relativePosition, x, y, rank, rankSizes):
+    def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
         node.coord = (x + relativePosition[node], -1 * (y + rankSizes[rank]/2.0))
         for linkid in node._out_links:
             link = self._link_dict[linkid]
@@ -1627,19 +1630,25 @@ class TermLayout(object):
 
     def treePlace(self, node, relativePosition):
         if len(node._out_links) == 0:
+            print 'Placing', node.name, 'with zero outlinks'
             relativePosition[node] = 0
             return [(-0.5, 0.5, 1)] # Triple L, R, size
 
+        print 'Determining left tree of', node.name
         childPos = []
         leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition)
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
+        print 'Looping through out links of', node.name
         for linkid in node._out_links[1:]:
             link = self._link_dict[linkid]
+            print 'Placing right tree based on', linkid
             rightTree = self.treePlace(self._nodes[link.sink], relativePosition)
+            print 'Calculating decal of', node.name
             decal = self.calcDecal(leftTree, rightTree)
             tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
 
+            print 'Checking mergeLR for node', node.name, 'link', linkid
             if self.mergeLR(leftTree, rightTree, decal) == leftTree:
                 childPos.append(tempLeft + decal)
                 rightTree = []
@@ -1650,6 +1659,7 @@ class TermLayout(object):
                 leftTree = rightTree
 
 
+        print 'Looping through out links of', node.name, 'a second time'
         posFather = (leftTree[0][0] + leftTree[0][1]) / 2.0
         leftTree.insert(0, (posFather - 0.5, posFather + 0.5, 1))
         for i, linkid in enumerate(node._out_links):
@@ -1660,38 +1670,45 @@ class TermLayout(object):
 
 
     def mergeLR(self, left, right, decal):
+        # Left and Right lists are tuples (left, right, size)
+        L = 0
+        R = 1
+        size = 2
+
         iL = 0
         iR = 0
         itL = 0
         itR = 0
 
+        print 'Beginning mergeLR loop of left', left, 'and right', right
         while itL != len(left) and itR != len(right):
-            minSize = min(left[itL][2] - iL, right[itR][2] - iR)
-            tmp = (left[itL][0], right[itR][1] + decal, minSize)
+            print 'Beginning itL', itL, 'itR', itR, 'left', left, 'right', right
+            minSize = min(left[itL][size] - iL, right[itR][size] - iR)
+            tmp = (left[itL][L], right[itR][R] + decal, minSize)
 
 
-            if left[itL][2] == 1:
+            if left[itL][size] == 1:
                 left[itL] = tmp
             else:
                 if iL == 0:
-                    if iL + minSize >= left[itL][2]:
+                    if iL + minSize >= left[itL][size]:
                         left[itL] = tmp
                     else:
                         left.insert(itL, tmp)
-                        left[itL][2] -= minSize
+                        left[itL][size] -= minSize
                         iL = -1 * minSize
                 else:
-                    if iL + minSize >= left[itL][2]: # end
-                        left[itL][2] -= minSize
+                    if iL + minSize >= left[itL][size]: # end
+                        left[itL][size] -= minSize
                         itL += 1
                         left.insert(itL, tmp)
                         iL = -1 * minSize
                     else: # middle
                         tmp2 = left[itL]
-                        left[itL][2] = iL
+                        left[itL][size] = iL
                         itL += 1
                         left.insert(itL, tmp)
-                        tmp2[2] -= iL + minSize
+                        tmp2[size] -= iL + minSize
                         left.insert(itL, tmp2)
                         itL -= 1
                         iL = -1 * minSize
@@ -1700,24 +1717,26 @@ class TermLayout(object):
             iL += minSize
             iR += minSize
 
-            if iL > left[itL][2]:
+            if iL >= left[itL][size]:
                 itL += 1
                 iL = 0
-            if iR > right[itR][2]:
+            if iR >= right[itR][size]:
                 itR += 1
                 iR = 0
 
+            print '   Ending itL', itL, 'itR', itR, 'left', left, 'right', right
+
         if itL != len(left) and iL != 0:
-            tmp = (left[itL][0], left[itL][1], left[itL][2] - iL)
+            tmp = (left[itL][L], left[itL][R], left[itL][size] - iL)
             itL += 1
 
         if itR != len(right) and iR != 0:
-            tmp = (right[itR][0] + decal, right[itR][1] + decal, right[itR][2] - iR)
+            tmp = (right[itR][L] + decal, right[itR][R] + decal, right[itR][size] - iR)
             left.append(tmp)
             itR += 1
 
             while itR < len(right):
-                tmp = (right[itR][0] + decal, right[itR][1] + decal, right[itR][2])
+                tmp = (right[itR][L] + decal, right[itR][R] + decal, right[itR][size])
                 left.append(tmp)
 
         return left
@@ -1783,20 +1802,28 @@ class TermLayout(object):
 
 
         # Reorder in rank
+        print "Checking single source tree..."
         if not self.single_source_tree:
+            print "Reducing crossings..."
             self.reduceCrossings(source_node, embedding)
             # TODO: Set Edge Order ? 
 
+            print "Crossings reduced, creating spanning tree..."
             self.createSpanningTree(embedding)
 
+        print "Preparing to apply tree algorithm..."
         # Apply Tree algorithm
         rankSizes = []
         for row in self.grid:
             rankSizes.append(len(row))
+        print "RTE time... "
         self.RTE(source_node, self.grid)
+        print "RTE clear."
 
         # Do Edge Bends
+        print "Computing edge bends..."
         self.computeEdgeBends()
+        print "Bends computed..."
 
         # We disallow self loops, so nothing to do here
 

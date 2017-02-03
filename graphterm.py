@@ -23,7 +23,8 @@ class TermDAG(object):
         self.TL = None
 
         self.layout = False
-        self.debug = True
+        self.debug = False
+        self.interactive = False
         self.output_tulip = True
         self.name = 'default'
 
@@ -102,7 +103,7 @@ class TermDAG(object):
 
     def interactive(self):
         self.layout_hierarchical()
-        if not self.debug:
+        if self.interactive:
             curses.wrapper(interactive_helper, self)
 
         # Persist the depiction with stdout:

@@ -1522,6 +1522,7 @@ class TermNode(object):
         self.label_pos = -1 # Int
         self.use_offset = True
         self.tulipNode = tulip
+        self.coord = (-1, -1)
 
         self.real = real # Real node or segment connector?
 
@@ -1748,14 +1749,14 @@ class TermLayout(object):
         iL = 0
         iR = 0
         decal = leftTree[iL][1] - rightTree[iR][0]
-        minSize = min(leftTree[iL][2], rightTree[iR][0])
+        minSize = min(leftTree[iL][2], rightTree[iR][2])
         sL = minSize
         sR = minSize
 
         if sL == leftTree[iL][2]:
             iL += 1
             sL = 0
-        if sR == rightTree[0][2]:
+        if sR == rightTree[iR][2]:
             iR += 1
             sR = 0
 
@@ -2001,6 +2002,10 @@ class TermLayout(object):
             end.add_in_link(lastLink.id)
 
 
+    def printNodeCoords(self):
+        print "Current node coordinates:"
+        for name, node in self._nodes.items():
+            print name, self.get_node_coord(name) 
 
     def create_single_source(self):
         sources = list()

@@ -24,7 +24,7 @@ class TermDAG(object):
 
         self.layout = False
         self.debug = False
-        self.interactive = False
+        self.do_interactive = False
         self.output_tulip = True
         self.name = 'default'
 
@@ -101,9 +101,20 @@ class TermDAG(object):
         self._nodes[sink].add_in_link(link)
         self.layout = False
 
+    def printonly(self):
+        self.layout_hierarchical()
+        self.grid_colors = []
+        for row in range(self.gridsize[0]):
+            self.grid_colors.append([self.default_color for x in range(self.gridsize[1])])
+        selected = self.node_order[0].name
+        self.select_node(None, selected, self.offset, False)
+
+        for i in range(self.gridsize[0]):
+            print self.print_color_row(i, 0, self.gridsize[1] + 1)
+
     def interactive(self):
         self.layout_hierarchical()
-        if self.interactive:
+        if self.do_interactive:
             curses.wrapper(interactive_helper, self)
 
         # Persist the depiction with stdout:

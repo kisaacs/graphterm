@@ -46,25 +46,29 @@ class TermDAG(object):
 
     def initialize_help(self):
         self.hpad = None # Help Pad
-        self.hpad_default_cmd = 'h'
-        self.hpad_default_msg = 'toggle help'
+        self.hpad_default_cmds = []
+        self.hpad_default_cmds.append('h')
+        self.hpad_default_cmds.append('q')
+        self.hpad_default_msgs = []
+        self.hpad_default_msgs.append('toggle help')
+        self.hpad_default_msgs.append('quit')
         self.hpad_pos_x = 0
         self.hpad_pos_y = 0
-        self.hpad_extent_x = len(self.hpad_default_cmd) + len(self.hpad_default_msg) + 5
-        self.hpad_extent_y = 2
+        self.hpad_extent_x = len(self.hpad_default_cmds[0]) + len(self.hpad_default_msgs[0]) + 5
+        self.hpad_extent_y = 3
         self.hpad_corner_x = 0
         self.hpad_corner_y = 0
         self.hpad_collapsed = True
 
         self.hpad_cmds = []
         self.hpad_msgs = []
-        self.hpad_cmds.append(self.hpad_default_cmd)
+        self.hpad_cmds.extend(self.hpad_default_cmds)
         self.hpad_cmds.append('/foo')
         self.hpad_cmds.append('ctrl-v')
         self.hpad_cmds.append('ctrl-w')
         self.hpad_cmds.append('ctrl-b')
         self.hpad_cmds.append('w,a,s,d')
-        self.hpad_msgs.append(self.hpad_default_msg)
+        self.hpad_msgs.extend(self.hpad_default_msgs)
         self.hpad_msgs.append('highlight node foo')
         self.hpad_msgs.append('change highlight mode')
         self.hpad_msgs.append('advance node')
@@ -619,13 +623,14 @@ class TermDAG(object):
     def collapse_help(self):
         self.hpad.clear()
         self.hpad_extent_x = self.hpad_max_x + 1
-        self.hpad_extent_y = 2
+        self.hpad_extent_y = len(self.hpad_default_cmds) + 1
         self.hpad_pos_x = self.width - self.hpad_extent_x - 1
         self.hpad_collapsed = True
-        helpline = self.make_hpad_string(self.hpad_default_cmd, self.hpad_default_msg,
-            len(self.hpad_default_cmd), len(self.hpad_default_msg))
-        self.hpad.addstr(0, self.hpad_max_cmd - len(self.hpad_default_cmd),
-            helpline, curses.A_REVERSE)
+        for i in range(len(self.hpad_default_cmds)): # TODO: Use zip
+            helpline = self.make_hpad_string(self.hpad_default_cmds[i],
+                self.hpad_default_msgs[i],
+                len(self.hpad_default_cmds[0]), len(self.hpad_default_msgs[0]))
+            self.hpad.addstr(i, 0, helpline, curses.A_REVERSE)
 
     def expand_help(self):
         self.hpad.clear()

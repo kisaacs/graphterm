@@ -619,8 +619,8 @@ class TermDAG(object):
         self.right_offset = 0
         for row, nodes in row_nodes.items():
             for node in nodes:
-                if node._col == 0:
-                    self.left_offset = max(self.left_offset, 1 + len(node.name))
+                if len(node.name) - node._col >= 0:
+                    self.left_offset = max(self.left_offset, 1 + len(node.name) - node._col)
 
             if len(nodes) == 1:
                 self.right_offset = max(self.right_offset, 1 + len(nodes[0].name))

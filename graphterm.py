@@ -434,29 +434,29 @@ class TermDAG(object):
             return left_bracket, right_bracket, left_pos, right_pos
 
         node.use_offset = True
-        if node._col < half_row:
-            if self.debug:
-                print 'Adding', node.name, 'to left bracket'
-            if left_bracket == '':
-                left_bracket = ' [ ' + node.name
-                node.label_pos = left_pos + 3
-                left_pos += len(node.name) + 3
-            else:
-                left_bracket += ', ' + node.name
-                node.label_pos = left_pos + 2
-                left_pos += len(node.name) + 2
-            left_nodes.append(node)
+        #if node._col < half_row:
+        #    if self.debug:
+        #        print 'Adding', node.name, 'to left bracket'
+        #    if left_bracket == '':
+        #        left_bracket = ' [ ' + node.name
+        #        node.label_pos = left_pos + 3
+        #        left_pos += len(node.name) + 3
+        #    else:
+        #        left_bracket += ', ' + node.name
+        #        node.label_pos = left_pos + 2
+        #        left_pos += len(node.name) + 2
+        #    left_nodes.append(node)
+        #else:
+        if self.debug:
+            print 'Adding', node.name, 'to right bracket'
+        if right_bracket == '':
+            right_bracket = ' [ ' + node.name
+            node.label_pos = right_pos + 3
+            right_pos += len(node.name) + 3
         else:
-            if self.debug:
-                print 'Adding', node.name, 'to right bracket'
-            if right_bracket == '':
-                right_bracket = ' [ ' + node.name
-                node.label_pos = right_pos + 3
-                right_pos += len(node.name) + 3
-            else:
-                right_bracket += ', ' + node.name
-                node.label_pos = right_pos + 2
-                right_pos += len(node.name) + 2
+            right_bracket += ', ' + node.name
+            node.label_pos = right_pos + 2
+            right_pos += len(node.name) + 2
 
         if self.debug:
             print 'placing', node.name, left_bracket, right_bracket
@@ -492,16 +492,16 @@ class TermDAG(object):
                     print 'placing', first.name, first.label_pos, 'on the left'
             else:
                 first.use_offset = True
-                if first._col < half_row:
-                    first_len = len(first.name) + 1
-                    first.label_pos = left_pos + first_len
-                    left_pos += first_len
-                    left_hang = first
-                    left_name = first.name
-                else:
-                    first.label_pos = right_pos # Don't add one, already built into brackets
-                    right_pos += len(first.name)
-                    right_name = first.name
+                #if first._col < half_row:
+                #    first_len = len(first.name) + 1
+                #    first.label_pos = left_pos + first_len
+                #    left_pos += first_len
+                #    left_hang = first
+                #    left_name = first.name
+                #else:
+                first.label_pos = right_pos # Don't add one, already built into brackets
+                right_pos += len(first.name)
+                right_name = first.name
                 if self.debug:
                     print 'placing', first.name, first.label_pos, 'as hang'
 
@@ -535,37 +535,38 @@ class TermDAG(object):
                     if self.debug:
                         print 'handling', node.name
                     if not self.place_label_right(node) and not self.place_label_left(node):
-                        if node._col >= half_row and right_name == '':
-                            if self.debug:
-                                print 'Placing', node.name, 'on the right'
+                        #if node._col >= half_row and right_name == '':
+                        #    if self.debug:
+                        #        print 'Placing', node.name, 'on the right'
+                        if right_name == '':
                             node.use_offset = True
                             node.label_pos = right_pos
                             right_pos += len(node.name)
                             right_name = node.name
-                        elif node._col < half_row and left_name == '':
-                            if self.debug:
-                                print 'Placing', node.name, 'on the left'
-                            node.use_offset = True
-                            node_len = len(node.name) + 1
-                            node.label_pos = left_pos + (node_len)
-                            left_pos += node_len
-                            left_hang = node
-                            left_name = node.name
+                        #elif node._col < half_row and left_name == '':
+                        #    if self.debug:
+                        #        print 'Placing', node.name, 'on the left'
+                        #    node.use_offset = True
+                        #    node_len = len(node.name) + 1
+                        #    node.label_pos = left_pos + (node_len)
+                        #    left_pos += node_len
+                        #    left_hang = node
+                        #    left_name = node.name
                         else:
                             left_bracket, right_bracket, left_pos, right_post \
                                 = self.place_label_bracket(node, left_bracket, right_bracket,
                                     left_pos, right_pos, left_nodes, half_row)
 
 
-            if left_bracket != '':
-                left_bracket += ' ] '
-                left_pos += 3
+            # if left_bracket != '':
+            #    left_bracket += ' ] '
+            #    left_pos += 3
             if right_bracket != '':
                 right_bracket += ' ]'
                 right_pos += 2
 
-            if self.debug:
-                print 'left bracket', left_bracket, 'right_bracket', right_bracket
+            # if self.debug:
+            #    print 'left bracket', left_bracket, 'right_bracket', right_bracket
             # Absolute positionining of the left hanging label
             if left_hang:
                 left_hang.use_offset = False
@@ -616,44 +617,23 @@ class TermDAG(object):
         comma_len = len(', ')
         self.left_offset = 0
         self.right_offset = 0
-        if self.debug:
-            print half_row, 'is half row'
         for row, nodes in row_nodes.items():
-            names_length = 0
             for node in nodes:
-                names_length += len(node.name)
+                if node._col == 0:
+                    self.left_offset = max(self.left_offset, 1 + len(node.name))
 
             if len(nodes) == 1:
-                if nodes[0]._col < half_row:
-                    self.left_offset = max(self.left_offset, 1 + names_length)
-                else:
-                    self.right_offset = max(self.right_offset, 1 + names_length)
-            elif len(nodes) == 2:
-                self.left_offset = max(self.left_offset, 1 + len(nodes[0].name))
-                self.right_offset = max(self.right_offset, 1 + len(nodes[1].name))
+                self.right_offset = max(self.right_offset, 1 + len(nodes[0].name))
             else:
                 # Figure out what bracket sides there are
-                left_side = 0
                 right_side = 0
                 for node in nodes[1:-1]:
-                    if node._col < half_row:
-                        if left_side == 0:
-                            left_side = bracket_len
-                        else:
-                            left_side += comma_len
-                        left_side += len(node.name)
-                        if self.debug:
-                            print 'Adding', node.name, 'to left side'
+                    if right_side == 0:
+                        right_side = bracket_len
                     else:
-                        if right_side == 0:
-                            right_side = bracket_len
-                        else:
-                            right_side += comma_len
-                        right_side += len(node.name)
-                        if self.debug:
-                            print 'Adding', node.name, 'to right side'
+                        right_side += comma_len
+                    right_side += len(node.name)
 
-                self.left_offset = max(self.left_offset, 1 + len(nodes[0].name) + left_side)
                 self.right_offset = max(self.right_offset, 1 + len(nodes[-1].name) + right_side)
         self.row_max = self.gridsize[1] + self.left_offset + self.right_offset
 

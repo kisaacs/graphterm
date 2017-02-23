@@ -595,6 +595,7 @@ class TermDAG(object):
                 print 'row last is', self.row_last_mark[row]
                 print 'placing right names: ', right_names
             for ch in right_names:
+                #print ch, row, start
                 self.grid[row][start] = ch
                 start += 1
 
@@ -627,7 +628,7 @@ class TermDAG(object):
             else:
                 # Figure out what bracket sides there are
                 right_side = 0
-                for node in nodes[1:-1]:
+                for node in nodes[:-1]:
                     if right_side == 0:
                         right_side = bracket_len
                     else:

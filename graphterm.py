@@ -3,6 +3,7 @@ from heapq import *
 import curses
 import curses.ascii
 import gv
+import math
 from tulip import *
 import math
 
@@ -27,6 +28,9 @@ class TermDAG(object):
         self.do_interactive = False
         self.output_tulip = True
         self.name = 'default'
+
+        self.left_offset = 0
+        self.right_offset = 0
 
         self.highlight_full_connectivity = False
 
@@ -281,6 +285,9 @@ class TermDAG(object):
         # Figure out how nodes map to rows so we can figure out label
         # placement allowances
         self.row_last = [0 for x in range(self.gridsize[0])]
+        self.row_last_mark = [0 for x in range(self.gridsize[0])]
+        self.row_first = [self.gridsize[1] for x in range(self.gridsize[0])]
+        self.row_first_mark = [self.gridsize[1] for x in range(self.gridsize[0])]
         for coord, node in coord_to_node.items():
             node._row = segment_pos[coord[1]]
             node._col = column_multiplier * col_lookup[coord[0]]
@@ -290,16 +297,14 @@ class TermDAG(object):
                 row_nodes[node._row].append(node)
                 if node._col > self.row_last[node._row]:
                     self.row_last[node._row] = node._col
+                    self.row_last_mark[node._row] = node._col
+                if node._col < self.row_first[node._row]:
+                    self.row_first[node._row] = node._col
+                    self.row_first_mark[node._row] = node._col
 
         # Sort the labels by left-right position
         for row, nodes in row_nodes.items():
             row_nodes[row] = sorted(nodes, key = lambda node: node._col)
-
-        self.calculate_labels(row_nodes)
-
-        # Max number of columns needed -- we add one for a space
-        # between the graph and the labels.
-        self.gridsize[1] = self.row_max + 1
 
         # Find the node order:
         self.node_order = sorted(self._nodes.values(),
@@ -317,10 +322,10 @@ class TermDAG(object):
             node._row = segment_pos[coord[1]]
             node._col = column_multiplier * col_lookup[coord[0]]
             if node.real:
-                self.grid[node._row][node._col] = 'o'
+                self.grid[node._row][self.left_offset + node._col] = 'o'
 
                 if self.debug:
-                    print 'Drawing node at', node._row, node._col
+                    print 'Drawing node at', node._row, self.left_offset + node._col
                     self.print_grid()
 
 
@@ -333,13 +338,45 @@ class TermDAG(object):
         status = 'passed'
         for segment in segments:
             segment.gridlist =  self.draw_line(segment)
-            self.row_last, err = self.set_to_grid(segment, self.row_last)
+            err = self.set_to_grid(segment) #, self.row_last)
+            if not err:
+                status = 'drawing'
+
+        self.grid = []
+        self.gridedge = []
+        self.grid_colors = []
+        self.calculate_max_labels(row_nodes)
+
+        # Max number of columns needed -- we add one for a space
+        # between the graph and the labels.
+        self.gridsize[1] = self.row_max + 1
+
+        # Re-create the grid for labels
+        for i in range(self.gridsize[0]):
+            self.grid.append([' ' for j in range(self.gridsize[1])])
+            self.gridedge.append(0)
+
+        # Re-Add the nodes in the grid
+        for coord, node in coord_to_node.items():
+            node._row = segment_pos[coord[1]]
+            node._col = column_multiplier * col_lookup[coord[0]]
+            if node.real:
+                self.grid[node._row][self.left_offset + node._col] = 'o'
+
+                if self.debug:
+                    print 'Drawing node at', node._row, self.left_offset + node._col
+                    self.print_grid()
+
+        # Re-Add segments to the grid
+        status = 'passed'
+        for segment in segments:
+            segment.gridlist =  self.draw_line(segment)
+            err = self.set_to_grid(segment) #, self.row_last)
             if not err:
                 status = 'drawing'
 
         # Add labels to the grid
-        self.calculate_labels(row_nodes, check_grid = True)
-        self.names_to_grid()
+        self.place_labels(row_nodes)
 
         if self.debug:
             self.print_grid()
@@ -349,66 +386,279 @@ class TermDAG(object):
         self.layout = True
         return status
 
-    def calculate_labels(self, row_nodes, check_grid = False):
-        # Figure out the max amount of space needed based on the labels
-        self.row_max = self.gridsize[1]
-        self.row_names = dict()
-        names = ''
+
+    def place_label_left(self, node):
+        y = node._row
+        x = self.left_offset + node._col - 2 # start one space before node
+        characters = len(node.name) + 1 # include space before node
+        while characters > 0:
+            if self.grid[y][x] != '' and self.grid[y][x] != ' ':
+                return False
+            x -= 1
+            characters -= 1
+
+        x = self.left_offset + node._col - 1 - len(node.name)
+        node.label_pos = x
+        node.use_offset = False
+        for ch in node.name:
+            self.grid[y][x] = ch
+            x += 1
+        return True
+
+
+    def place_label_right(self, node):
+        y = node._row
+        x = self.left_offset + node._col + 2 # start one space after node
+        characters = len(node.name) + 1 # include space after node
+        while characters > 0:
+            if self.grid[y][x] != '' and self.grid[y][x] != ' ':
+                return False
+            x += 1
+            characters -= 1
+
+        x = self.left_offset + node._col + 2
+        node.label_pos = x
+        node.use_offset = False
+        for ch in node.name:
+            self.grid[y][x] = ch
+            x += 1
+
+        return True
+
+    def place_label_bracket(self, node, left_bracket, right_bracket,
+        left_pos, right_pos, left_nodes, half_row):
+
+        if self.place_label_right(node):
+            return left_bracket, right_bracket, left_pos, right_pos
+        if self.place_label_left(node):
+            return left_bracket, right_bracket, left_pos, right_pos
+
+        node.use_offset = True
+        if node._col < half_row:
+            if self.debug:
+                print 'Adding', node.name, 'to left bracket'
+            if left_bracket == '':
+                left_bracket = ' [ ' + node.name
+                node.label_pos = left_pos + 3
+                left_pos += len(node.name) + 3
+            else:
+                left_bracket += ', ' + node.name
+                node.label_pos = left_pos + 2
+                left_pos += len(node.name) + 2
+            left_nodes.append(node)
+        else:
+            if self.debug:
+                print 'Adding', node.name, 'to right bracket'
+            if right_bracket == '':
+                right_bracket = ' [ ' + node.name
+                node.label_pos = right_pos + 3
+                right_pos += len(node.name) + 3
+            else:
+                right_bracket += ', ' + node.name
+                node.label_pos = right_pos + 2
+                right_pos += len(node.name) + 2
+
+        if self.debug:
+            print 'placing', node.name, left_bracket, right_bracket
+        return left_bracket, right_bracket, left_pos, right_pos
+
+
+    def place_labels(self, row_nodes):
+        if self.debug:
+            print 'gridsize is', self.gridsize
+            print 'offsets are', self.left_offset, self.right_offset
+        # Place the labels on the grid
         for row, nodes in row_nodes.items():
-            pos = 0
-            first = nodes[-1].name # Draw the last next to its node
-            nodes[-1].label_pos = pos
-            pos += len(first)
+            half_row = math.floor(self.row_last_mark[row] / 2) - 1 # subtract for indexing at 0
+            left_pos = 0
+            right_pos = 0
+            left_bracket = ''
+            right_bracket = ''
+            left_nodes = []
+            left_hang = None
+            right_name = ''
+            left_name = ''
 
-            # Draw the rest in a bracketed list]
-            rest = ''
+            # Special case: First node
+            first = nodes[0]
+            if self.place_label_right(first):
+                if self.debug:
+                    print 'placing', first.name, first.label_pos, 'on the right'
+            elif self.place_label_left(first):
+                if first._col == self.row_first_mark[row]:
+                    left_pos = len(first.name) + 1
+                    left_name = first.name
+                if self.debug:
+                    print 'placing', first.name, first.label_pos, 'on the left'
+            else:
+                first.use_offset = True
+                if first._col < half_row:
+                    first_len = len(first.name) + 1
+                    first.label_pos = left_pos + first_len
+                    left_pos += first_len
+                    left_hang = first
+                    left_name = first.name
+                else:
+                    first.label_pos = right_pos # Don't add one, already built into brackets
+                    right_pos += len(first.name)
+                    right_name = first.name
+                if self.debug:
+                    print 'placing', first.name, first.label_pos, 'as hang'
+
+            # Special case: Last node
             if len(nodes) > 1:
-                for node in nodes[:-1]:
-                    can_place = False
-                    if check_grid: # Attempt to place the label
-                        can_place = True
-                        y = node._row
-                        x = node._col + 2 # start one space after node
-                        characters = len(node.name) + 1 # (space after)
-                        while characters > 0 and can_place:
-                            if self.grid[y][x] != '' and self.grid[y][x] != ' ':
-                                can_place = False
-                                break
-                            x += 1
-                            characters -= 1
+                last = nodes[-1]
+                if self.place_label_right(last):
+                    if last._col == self.row_last_mark[row]:
+                        right_pos += len(last.name)
+                        right_name = last.name
+                    if self.debug:
+                        print 'placing', last.name, last.label_pos, 'on the right'
+                elif not self.place_label_left(last):
+                    if right_name == '':
+                        last.use_offset = True
+                        last.label_pos = right_pos
+                        right_pos += len(last.name)
+                        right_name = last.name
+                        if self.debug:
+                            print 'placing', last.name, last.label_pos, 'as right hang'
+                    else:
+                        left_bracket, right_bracket, left_pos, right_post \
+                            = self.place_label_bracket(last, left_bracket, right_bracket,
+                                left_pos, right_pos, left_nodes, half_row)
+                        if self.debug:
+                            print 'placing', last.name, last.label_pos, 'in bracket'
 
-                    if can_place:
-                        x = node._col + 2
-                        node.label_pos = x
-                        node.use_offset = False
-                        for ch in node.name:
-                            self.grid[y][x] = ch
-                            x += 1
-                    else: # Everything goes on the end
-                        node.use_offset = True
-                        if rest == '':
-                            rest = ' [ ' + node.name
-                            node.label_pos = pos + 3
-                            pos += len(node.name) + 3
+            # Draw the rest 
+            if len(nodes) > 2:
+                for node in nodes[1:-1]:
+                    if self.debug:
+                        print 'handling', node.name
+                    if not self.place_label_right(node) and not self.place_label_left(node):
+                        if node._col >= half_row and right_name == '':
+                            if self.debug:
+                                print 'Placing', node.name, 'on the right'
+                            node.use_offset = True
+                            node.label_pos = right_pos
+                            right_pos += len(node.name)
+                            right_name = node.name
+                        elif node._col < half_row and left_name == '':
+                            if self.debug:
+                                print 'Placing', node.name, 'on the left'
+                            node.use_offset = True
+                            node_len = len(node.name) + 1
+                            node.label_pos = left_pos + (node_len)
+                            left_pos += node_len
+                            left_hang = node
+                            left_name = node.name
                         else:
-                            rest += ', ' + node.name
-                            node.label_pos = pos + 2
-                            pos += len(node.name) + 2
+                            left_bracket, right_bracket, left_pos, right_post \
+                                = self.place_label_bracket(node, left_bracket, right_bracket,
+                                    left_pos, right_pos, left_nodes, half_row)
 
-                if rest != '':
-                    rest += ' ]'
-            names = first + rest
-            self.row_max = max(self.row_max, self.gridsize[1] + 1 + len(names))
-            self.row_names[row] = names
 
-    def names_to_grid(self, highlight = ''):
-        for row, names in self.row_names.items():
-            start = self.row_last[row] + 2 # Space between
-            for ch in names:
+            if left_bracket != '':
+                left_bracket += ' ] '
+                left_pos += 3
+            if right_bracket != '':
+                right_bracket += ' ]'
+                right_pos += 2
+
+            if self.debug:
+                print 'left bracket', left_bracket, 'right_bracket', right_bracket
+            # Absolute positionining of the left hanging label
+            if left_hang:
+                left_hang.use_offset = False
+                left_hang.label_pos = self.left_offset + self.row_first_mark[row] - len(left_hang.name)
+
+            row_left_offset = self.left_offset + self.row_first_mark[row] - left_pos
+            #- len(left_name) - len(left_bracket)
+
+            if self.debug:
+                print 'Row', row, self.left_offset, self.row_first_mark[row], \
+                    len(left_name), len(left_bracket), left_pos, row_left_offset
+            # Absolute positioning of the left bracket labels
+            for node in left_nodes:
+                node.use_offset = False
+                if self.debug:
+                    print 'Positioning', node.name, 'at', node.label_pos, '+', row_left_offset
+                node.label_pos += row_left_offset - len(left_name) - 1
+
+
+            # Place bracketed elements
+            start = self.left_offset + self.row_last_mark[row] + 2 # Space between
+            right_names = right_name + right_bracket
+            if self.debug:
+                print 'gridsize is', self.gridsize
+                print 'offsets are', self.left_offset, self.right_offset
+                print 'row last is', self.row_last_mark[row]
+                print 'placing right names: ', right_names
+            for ch in right_names:
                 self.grid[row][start] = ch
                 start += 1
 
-    def set_to_grid(self, segment, row_last):
+            start = row_left_offset
+            left_names = left_bracket
+            if left_hang:
+                left_names += ' ' + left_name
+            if self.debug:
+                print 'placing left names: ', left_names
+            for ch in left_names:
+                self.grid[row][start] = ch
+                start += 1
+
+
+    def calculate_max_labels(self, row_nodes):
+        # Figure out the max amount of space needed based on the labels
+        self.row_max = 0
+        half_row = math.floor(self.gridsize[1] / 2) - 1 # subtract for indexing at 0
+        bracket_len = len(' [ ') + len(' ]')
+        comma_len = len(', ')
+        self.left_offset = 0
+        self.right_offset = 0
+        if self.debug:
+            print half_row, 'is half row'
+        for row, nodes in row_nodes.items():
+            names_length = 0
+            for node in nodes:
+                names_length += len(node.name)
+
+            if len(nodes) == 1:
+                if nodes[0]._col < half_row:
+                    self.left_offset = max(self.left_offset, 1 + names_length)
+                else:
+                    self.right_offset = max(self.right_offset, 1 + names_length)
+            elif len(nodes) == 2:
+                self.left_offset = max(self.left_offset, 1 + len(nodes[0].name))
+                self.right_offset = max(self.right_offset, 1 + len(nodes[1].name))
+            else:
+                # Figure out what bracket sides there are
+                left_side = 0
+                right_side = 0
+                for node in nodes[1:-1]:
+                    if node._col < half_row:
+                        if left_side == 0:
+                            left_side = bracket_len
+                        else:
+                            left_side += comma_len
+                        left_side += len(node.name)
+                        if self.debug:
+                            print 'Adding', node.name, 'to left side'
+                    else:
+                        if right_side == 0:
+                            right_side = bracket_len
+                        else:
+                            right_side += comma_len
+                        right_side += len(node.name)
+                        if self.debug:
+                            print 'Adding', node.name, 'to right side'
+
+                self.left_offset = max(self.left_offset, 1 + len(nodes[0].name) + left_side)
+                self.right_offset = max(self.right_offset, 1 + len(nodes[-1].name) + right_side)
+        self.row_max = self.gridsize[1] + self.left_offset + self.right_offset
+
+
+    def set_to_grid(self, segment): #, row_last):
         success = True
         start = segment.start
         end = segment.end
@@ -421,6 +671,11 @@ class TermDAG(object):
                 segment.end._row, ']', segment.gridlist, segment
         for i, coord in enumerate(segment.gridlist):
             x, y, char, draw = coord
+            if x > self.row_last_mark[y]:
+                self.row_last_mark[y] = x
+            if x < self.row_first_mark[y]:
+                self.row_first_mark[y] = x
+            x += self.left_offset
             if self.debug:
                 print 'Drawing', char, 'at', x, y
             if not draw or char == '':
@@ -447,14 +702,15 @@ class TermDAG(object):
                     print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
                     success = False
                     self.grid[y][x] = 'X'
-            if x > row_last[y]:
-                row_last[y] = x
+            #if x > row_last[y]:
+            #    row_last[y] = x
             last_x = x
             last_y = y
 
             if self.debug:
                 self.print_grid()
-        return row_last, success
+        #return row_last, success
+        return success
 
     def draw_line(self, segment):
         x1 = segment.start._col
@@ -865,6 +1121,7 @@ class TermDAG(object):
         for segment in segments:
             for i, coord in enumerate(segment.gridlist):
                 x, y, char, draw = coord
+                x += self.left_offset
                 if not draw or char == '':
                     continue
                 self.grid_colors[y][x] = 5
@@ -892,11 +1149,13 @@ class TermDAG(object):
             return ''
 
         node = self._nodes[name]
-        self.pad.addch(node._row, node._col, 'o', curses.color_pair(color))
-        self.grid_colors[node._row][node._col] = color
+        self.pad.addch(node._row, self.left_offset + node._col, 'o', curses.color_pair(color))
+        self.grid_colors[node._row][self.left_offset + node._col] = color
         label_offset = 0
         if node.use_offset:
-            label_offset = self.row_last[node._row] + 2
+            # Offset for shifting the graph, starting at the last mark in the
+            # row, and then an extra space after the last mark
+            label_offset = self.left_offset + self.row_last_mark[node._row] + 2
         for i, ch in enumerate(node.name):
             self.grid_colors[node._row][label_offset + node.label_pos + i] = color
             self.pad.addch(node._row, label_offset + node.label_pos + i,

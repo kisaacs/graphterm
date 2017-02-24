@@ -2,7 +2,6 @@ import heapq
 from heapq import *
 import curses
 import curses.ascii
-import gv
 import math
 from tulip import *
 import math
@@ -1163,69 +1162,6 @@ class TermDAG(object):
             print link.source, link.sink, link._coords
             if self.TL and self.TL.is_valid():
                 print "TL: ", self.TL.get_link_segments(link.id)
-
-    def to_dot_object(self):
-        dot = gv.digraph('term')
-
-        for node in self._nodes.values():
-            gv.node(dot, node.name)
-
-        for link in self._links:
-            gv.edge(dot, link.source, link.sink)
-
-        return dot
-
-    def write_dot_attributes(self, dot):
-        """Write the position values for each node."""
-
-        for node in self._nodes.values():
-            handle = gv.findnode(dot, node.name)
-            if self.debug:
-                print node.name, gv.getv(handle, 'rank'), gv.getv(handle, 'pos')
-
-            attr = gv.firstattr(handle)
-            while (attr):
-                print gv.nameof(attr)
-                attr = gv.nextattr(handle, attr)
-
-    def get_dot_positions(self, dot):
-        """Get positions given by dot."""
-
-        gv.setv(dot, 'ranksep', '1.0 equally')
-        plaintext = gv.renderdata(dot, 'plain')
-        print plaintext
-
-        xset = set()
-        yset = set()
-        for line in plaintext.split('\n'):
-            linevals = line.split(' ')
-            if linevals[0] == 'node':
-                node = self._nodes[linevals[1]]
-                node._x = linevals[2]
-                node._y = linevals[3]
-                xset.add(linevals[2])
-                yset.add(linevals[3])
-
-        self._positions_set = True
-
-        for node in self._nodes.values():
-            print node.name, node._x, node._y
-        print sorted(xset)
-        print sorted(yset)
-
-        x_to_col = dict()
-        for i, val in enumerate(sorted(xset)):
-            x_to_col[val] = i
-
-        y_to_row = dict()
-        num_ranks = len(yset)
-        for i, val in enumerate(sorted(yset)):
-            y_to_row[val] = num_ranks - i - 1
-
-        for node in self._nodes.values():
-            node._row = y_to_row[node._y]
-            node._col = x_to_col[node._x]
-            print node.name, node._row, node._col
 
     def print_pqueue(self):
         return

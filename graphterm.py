@@ -957,7 +957,9 @@ class TermDAG(object):
                 # Quit
                 if ch == ord('q') or ch == ord('Q') or ch == curses.KEY_ENTER \
                     or ch == 10:
-                    self.logfile.close()
+                    if self.logfile:
+                        self.logfile.write('\n')
+                        self.logfile.close()
                     return
 
                 # Start Node Selection

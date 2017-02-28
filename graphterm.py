@@ -522,7 +522,7 @@ class TermDAG(object):
                         if self.debug:
                             print 'placing', last.name, last.label_pos, 'as right hang'
                     else:
-                        left_bracket, right_bracket, left_pos, right_post \
+                        left_bracket, right_bracket, left_pos, right_pos \
                             = self.place_label_bracket(last, left_bracket, right_bracket,
                                 left_pos, right_pos, left_nodes, half_row)
                         if self.debug:
@@ -552,7 +552,7 @@ class TermDAG(object):
                         #    left_hang = node
                         #    left_name = node.name
                         else:
-                            left_bracket, right_bracket, left_pos, right_post \
+                            left_bracket, right_bracket, left_pos, right_pos \
                                 = self.place_label_bracket(node, left_bracket, right_bracket,
                                     left_pos, right_pos, left_nodes, half_row)
 

@@ -8,7 +8,10 @@ import math
 
 class TermDAG(object):
 
-    def __init__(self):
+    def __init__(self, logfile = None):
+        self.logfile = logfile
+        if logfile:
+            self.logfile = open(logfile, 'a')
         self._nodes = dict()
         self._links = list()
         self._positions_set = False
@@ -46,6 +49,8 @@ class TermDAG(object):
 
         self.initialize_help()
 
+    def log_character(self, ch):
+        self.logfile.write(str(unichr(ch)))
 
     def initialize_help(self):
         self.hpad = None # Help Pad
@@ -937,6 +942,9 @@ class TermDAG(object):
         selected = ''
         while True:
             ch = stdscr.getch()
+            if self.logfile:
+                self.log_character(ch)
+
             if ch == curses.KEY_MOUSE:
                 pass
             elif ch == curses.KEY_RESIZE:
@@ -949,6 +957,7 @@ class TermDAG(object):
                 # Quit
                 if ch == ord('q') or ch == ord('Q') or ch == curses.KEY_ENTER \
                     or ch == 10:
+                    self.logfile.close()
                     return
 
                 # Start Node Selection

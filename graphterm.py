@@ -963,25 +963,49 @@ class TermDAG(object):
                     stdscr.move(self.height - 1, 0)
 
                 # Scroll (TODO: Trackpad scroll)
-                elif ch == ord('w'):
+                elif ch == ord('s') or ch == curses.KEY_DOWN or ch == 40:
                     self.scroll_up()
                     stdscr.refresh()
                     self.refresh_pad()
 
-                elif ch == ord('s'):
+                elif ch == ord('w') or ch == curses.KEY_UP or ch == 38:
                     self.scroll_down()
                     stdscr.refresh()
                     self.refresh_pad()
 
-                elif ch == ord('d'):
+                elif ch == ord('a') or ch == curses.KEY_LEFT or ch == 37:
                     self.scroll_right()
                     stdscr.refresh()
                     self.refresh_pad()
 
-                elif ch == ord('a'):
+                elif ch == ord('d') or ch == curses.KEY_RIGHT or ch == 39:
                     self.scroll_left()
                     stdscr.refresh()
                     self.refresh_pad()
+
+                elif ch == ord('p'):
+                    if selected:
+                        selected = self.node_order[(-1 + self._nodes[selected].order)
+                            % len(self.node_order)].name
+                    else:
+                        selected = self.node_order[-1].name
+
+                    self.select_node(stdscr, selected, self.offset)
+                    self.refresh_pad()
+                    stdscr.move(self.height - 1, 0)
+                    stdscr.refresh()
+
+                elif ch == ord('n'):
+                    if selected:
+                        selected = self.node_order[(1 + self._nodes[selected].order)
+                            % len(self.node_order)].name
+                    else:
+                        selected = self.node_order[0].name
+
+                    self.select_node(stdscr, selected, self.offset)
+                    self.refresh_pad()
+                    stdscr.move(self.height - 1, 0)
+                    stdscr.refresh()
 
                 # Start Ctrl Command
                 else:

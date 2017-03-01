@@ -60,10 +60,12 @@ class TermDAG(object):
     def initialize_question(self):
         self.qpad_pos_x = 0
         self.qpad_pos_y = 0
-        self.qpad_extent_x = len(self.question) + 1
+        self.qpad_extent_x = len(self.question)
         self.qpad_extent_y = 2
         self.qpad_corner_x = 0
         self.qpad_corner_y = 0
+        self.qpad_max_x = self.qpad_extent_x + 1
+        self.qpad_max_y = 3
 
     def initialize_help(self):
         self.hpad = None # Help Pad

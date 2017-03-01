@@ -8,10 +8,11 @@ import math
 
 class TermDAG(object):
 
-    def __init__(self, logfile = None):
+    def __init__(self, logfile = None, question = None):
         self.logfile = logfile
         if logfile:
             self.logfile = open(logfile, 'a')
+        self.question = question
         self._nodes = dict()
         self._links = list()
         self._positions_set = False
@@ -49,18 +50,20 @@ class TermDAG(object):
 
         self.initialize_help()
 
+        self.qpad = None
+        if self.question:
+            self.initialize_question()
+
     def log_character(self, ch):
         self.logfile.write(str(unichr(ch)))
 
     def initialize_question(self):
         self.qpad_pos_x = 0
         self.qpad_pos_y = 0
-        self.qpad_extent_x = len(self.question)
-        self.qpad_extent_y = 1
+        self.qpad_extent_x = len(self.question) + 1
+        self.qpad_extent_y = 2
         self.qpad_corner_x = 0
         self.qpad_corner_y = 0
-        self.qpad_max_x = self.qpad_extent_x + 1
-        self.qpad_max_y = 2
 
     def initialize_help(self):
         self.hpad = None # Help Pad
@@ -865,6 +868,8 @@ class TermDAG(object):
             self.pad_pos_y, self.pad_pos_x,
             self.pad_extent_y, self.pad_extent_x)
         self.refresh_hpad()
+        if self.qpad:
+            self.refresh_qpad()
 
     def toggle_help(self, stdscr):
         if self.hpad_collapsed:
@@ -919,6 +924,11 @@ class TermDAG(object):
             self.hpad_pos_y + self.hpad_extent_y,
             self.hpad_pos_x + self.hpad_extent_x)
 
+    def refresh_qpad(self):
+        self.qpad.refresh(self.qpad_corner_y, self.qpad_corner_x,
+            self.qpad_pos_y, self.qpad_pos_x,
+            self.qpad_pos_y + self.qpad_extent_y,
+            self.qpad_pos_x + self.qpad_extent_x)
 
     def print_interactive(self, stdscr, has_colors = False):
         self.pad = curses.newpad(self.gridsize[0] + 1, self.gridsize[1] + 1)
@@ -926,6 +936,10 @@ class TermDAG(object):
         self.pad_corner_x = 0 # position shown in the pad
 
         self.hpad = curses.newpad(self.hpad_max_y + 1, self.hpad_max_x + 1)
+
+        if self.question:
+            self.qpad = curses.newpad(self.qpad_max_y, self.qpad_max_x)
+            self.qpad.addstr(0, 0, self.question)
 
         self.resize(stdscr)
 
@@ -951,6 +965,9 @@ class TermDAG(object):
         self.collapse_help()
         stdscr.refresh()
         self.refresh_pad()
+        self.refresh_hpad()
+        if self.qpad:
+            self.refresh_qpad()
         stdscr.move(self.height - 1, 0)
 
         command = ''
@@ -967,6 +984,10 @@ class TermDAG(object):
                 stdscr.clear()
                 stdscr.refresh()
                 self.refresh_pad()
+                self.refresh_hpad()
+                if selft.qpad:
+                    self.refresh_qpad()
+                stdscr.move(self.height - 1, 0)
             elif command == '': # Awaiting new Command
 
                 # Quit

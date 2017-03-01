@@ -827,6 +827,12 @@ class TermDAG(object):
         else:
             self.pad_extent_x = self.width - 1
 
+        self.hpad_pos_x = self.width - self.hpad_extent_x - 1
+        if self.qpad:
+            if self.gridsize[0] + 2 < self.height:
+                self.qpad_pos_y = self.height - self.gridsize[0] - 2
+            else:
+                self.qpad_pos_y = 0
 
     def scroll_up(self):
         if self.pad_corner_y + (self.pad_extent_y - self.pad_pos_y) < self.gridsize[0]:
@@ -935,7 +941,6 @@ class TermDAG(object):
         self.collapse_help()
         stdscr.refresh()
         self.refresh_pad()
-        self.refresh_hpad()
         stdscr.move(self.height - 1, 0)
 
         command = ''

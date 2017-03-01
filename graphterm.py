@@ -839,8 +839,8 @@ class TermDAG(object):
 
         self.hpad_pos_x = self.width - self.hpad_extent_x - 1
         if self.qpad:
-            if self.gridsize[0] + 2 < self.height:
-                self.qpad_pos_y = self.height - self.gridsize[0] - 2
+            if self.gridsize[0] + 3 < self.height:
+                self.qpad_pos_y = self.height - self.gridsize[0] - 3
             else:
                 self.qpad_pos_y = 0
 

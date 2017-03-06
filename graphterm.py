@@ -1664,7 +1664,8 @@ class TermSegment(object):
         self.y2 = y2
         self.name = name
         self.BSTNode = None
-        self.vertical = (self.y1 == self.y2)
+        self.vertical = (abs(self.x1 - self.x2) < 0.001)
+        print "Setting vertical to ", self.vertical, "for", x1, x2
 
         # Initial sort order for crossing detection
         # Since y is negative, in normal sort order, we start from there
@@ -1852,10 +1853,8 @@ class TermSegment(object):
         return False
 
     def __repr__(self):
-        return "[%s, %s] - %s - TermSegment(%s, %s, %s, %s)" % (self.b1, self.b2, self.name, self.x1, self.y1,
-            self.x2, self.y2)
-        return "[%s, %s] - TermSegment(%s, %s, %s, %s)" % (self.b1, self.b2, self.x1, self.y1,
-            self.x2, self.y2)
+        return "[%s, %s] - %s - TermSegment(%s, %s, %s, %s, %s)" % (self.b1, self.b2, self.name, self.x1, self.y1,
+            self.x2, self.y2, self.vertical)
 
     def __hash__(self):
         return hash(self.__repr__())
@@ -1929,11 +1928,13 @@ class TermNode(object):
 
         # We set different offsets for different x values based on the
         # min and max x -- we never go higher than half way up the y value
+        print "crossings for", self.name, self._x, self._y
         for y, count in self.crossing_counts.items():
+            print "   ", y, count
             if count > 0:
                 normalized = 0.5 * (self._x - min_x) / (max_x - min_x)
                 offset = (self._y - y) * normalized
-                self.crossing_heights[y] = self._y - ofset
+                self.crossing_heights[y] = self._y - offset
 
 
     def skeleton_copy(self):

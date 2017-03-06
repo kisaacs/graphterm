@@ -222,6 +222,7 @@ class TermDAG(object):
                 if (coord[0], coord[1]) in coord_to_node:
                     placer = coord_to_node[(coord[0], coord[1])]
                     segment.end = placer
+                    segment.original_end = placer
                     placer.add_in_segment(segment)
                 else:
                     placer = TermNode("", None, False)
@@ -231,6 +232,7 @@ class TermDAG(object):
                     placer._x = coord[0]
                     placer._y = coord[1]
                     segment.end = placer
+                    segment.original_end = placer
                     placer.add_in_segment(segment)
 
                 last = (coord[0], coord[1])
@@ -249,6 +251,7 @@ class TermDAG(object):
             placer = coord_to_node[last]
             segment.start = placer
             segment.end = self._nodes[link.sink]
+            segment.original_end = self._nodes[link.sink]
 
         if self.debug:
             self.write_tulip_positions();
@@ -277,7 +280,7 @@ class TermDAG(object):
             #crossed_segments.insert(k[1])
 
         for placer in self.placers:
-            placer.findInExtents(self.min_tulip_x, self.max_tulip_x)
+            placer.findInExtents(self.min_tulip_x, self.max_tulip_x, self.debug)
 
 
         #for name in crossed_segments:
@@ -292,20 +295,29 @@ class TermDAG(object):
         # More than one has them: Ignore for now
         for v, k in crossings_points.items():
             x, y = v
+            if self.debug:
+                print k, v
             special_heights = list()
+            if self.debug:
+                print "Testing point', v"
             for name in k:
                 segment = self.segment_ids[name]
                 #print 'Testing point', v, 'for segment', segment, 'with height', segment.end.crossing_heights
                 #print '  Is', segment.y1, 'there?'
-                if segment.y1 in segment.end.crossing_heights:
-                    #print '       appending'
-                    special_heights.append(segment.end.crossing_heights[segment.y1])
+                if self.debug:
+                    print '   segment', segment.name, 'at end', segment.origin.original_end._x, segment.origin.original_end._y
+                if segment.y1 in segment.origin.original_end.crossing_heights:
+                    if self.debug:
+                        print '       found at height', segment.origin.original_end.crossing_heights[segment.y1]
+                    special_heights.append(segment.origin.original_end.crossing_heights[segment.y1])
 
             placer_y = y
+            bundle = False
             #print "Length of spcil heights is", len(special_heights)
             if len(special_heights) == 1:
                 #print 'setting placer y to', special_heights[0]
                 placer_y = special_heights[0]
+                bundle = True
             elif len(special_heights) > 1:
                 #print "Special heights are", special_heights
                 #for name in k:
@@ -325,7 +337,9 @@ class TermDAG(object):
             # Create segment break
             for name in k:
                 segment = self.segment_ids[name]
-                new_segment = segment.split(placer)
+                if self.debug:
+                    print "Creating new segment from:", segment, "at", placer._x, placer._y
+                new_segment = segment.split(placer, bundle, self.debug)
                 segments.add(new_segment)
             xset.add(x)
             yset.add(placer_y)
@@ -1521,9 +1535,9 @@ class TermBST(object):
 
     def find_previous(self, segment, debug = False):
         node = segment.BSTNode
-        if node is None and debug:
-            print "ERROR, could not find", segment, " in find_previous"
-            return None
+        #if node is None and debug:
+        #    print "ERROR, could not find", segment, " in find_previous"
+        #    return None
         predecessor = node.left
         last = predecessor
         while predecessor:
@@ -1576,7 +1590,7 @@ class TermBST(object):
         if node is None:
             #if debug:
             #    print "ERROR, could not find", segment, "in delete"
-            #   self.print_tree()
+            #    self.print_tree()
             return
 
         replacement = None
@@ -1690,6 +1704,7 @@ class TermSegment(object):
         # From splits
         self.children = []
         self.origin = self
+        self.original_end = None
         self.extent = True # will be considered for crossing
         self.split_groups = dict() # (y, dest-segment-name) -> SplitGroup
         self.vertical_crossing_count = 0
@@ -1732,18 +1747,30 @@ class TermSegment(object):
         seg += xlen + ylen
         return seg
 
-    def split(self, node):
+    def split(self, node, bundle = False, debug = False):
         """Split this segment into two at node. Return the next segment.
 
            Note the new segment is always the second part (closer to the sink).
         """
 
         # The one we are splitting from -- may have been updated by a previous split
+        # Note that now that we can define horizontal paths, we can't rely on 
+        # the y value to totally define. 
         splitter = self
-        if node._y > self.y1 or node._y < self.y2:
-            for child in self.origin.children:
-                if node._y < child.y1 and node._y > child.y2:
-                    splitter = child
+        if bundle:
+            if node._x > self.x1 or node._x < self.x2:
+                for child in self.origin.children:
+                    if node._x < child.x1 and node._x > child.x2:
+                        splitter = child
+                        if debug:
+                            print "Splitting on child (x):", child
+        else:
+            if node._y > self.y1 or node._y < self.y2:
+                for child in self.origin.children:
+                    if node._y < child.y1 and node._y > child.y2:
+                        splitter = child
+                        if debug:
+                            print "Splitting on child (y):", child
 
         #print "Breakpoint is", node._x, node._y
         #print "Self is", self
@@ -1906,13 +1933,17 @@ class TermNode(object):
             self.crossings[y] = list()
         self.crossings[y].append((segment, point))
 
-    def findInExtents(self, min_x, max_x):
+    def findInExtents(self, min_x, max_x, debug = False):
+        if debug:
+            print 'Find extents', self.name, self._x, self._y
         for segment in self._in_segments:
             y = segment.y1
             x = segment.x1
             if y not in self.crossing_counts:
                 self.crossing_counts[y] = 0
             self.crossing_counts[y] += segment.vertical_crossing_count
+            if debug:
+                print '   Segment:', segment.name, segment.x1, segment.y1, segment.vertical_crossing_count
             if x < self._x: # left
                 if y not in self.in_left:
                     self.in_left[y] = segment

@@ -295,17 +295,22 @@ class TermDAG(object):
             special_heights = list()
             for name in k:
                 segment = self.segment_ids[name]
+                print 'Testing point', v, 'for segment', segment, 'with height', segment.end.crossing_heights
+                print '  Is', segment.y1, 'there?'
                 if segment.y1 in segment.end.crossing_heights:
+                    print '       appending'
                     special_heights.append(segment.end.crossing_heights[segment.y1])
 
             placer_y = y
-            if len(special_heights) > 1:
+            print "Length of spcil heights is", len(special_heights)
+            if len(special_heights) == 1:
+                print 'setting placer y to', special_heights[0]
+                placer_y = special_heights[0]
+            elif len(special_heights) > 1:
                 print "Special heights are", special_heights
                 for name in k:
                     print " ---", self.segment_ids[name]
                 continue
-            elif len(special_heights) == 1:
-                placer_y = special_heights[0]
 
             # Get placer
             if (x,placer_y) in coord_to_node:
@@ -1665,7 +1670,6 @@ class TermSegment(object):
         self.name = name
         self.BSTNode = None
         self.vertical = (abs(self.x1 - self.x2) < 0.001)
-        print "Setting vertical to ", self.vertical, "for", x1, x2
 
         # Initial sort order for crossing detection
         # Since y is negative, in normal sort order, we start from there

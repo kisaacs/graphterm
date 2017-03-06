@@ -1337,9 +1337,9 @@ class TermDAG(object):
             segment1 = self.segment_ids[name1]
             segment2 = self.segment_ids[name2]
 
-            if self.debug:
-                print "\n     Popping", x1, y1, segment1, segment2
-                self.print_pqueue()
+            #if self.debug:
+            #    print "\n     Popping", x1, y1, segment1, segment2
+            #    self.print_pqueue()
 
             if segment1.is_top_endpoint(x1, y1):
                 self.top_endpoint(segment1)
@@ -1352,9 +1352,9 @@ class TermDAG(object):
     def top_endpoint(self, segment):
         self.bst.insert(segment)
 
-        if self.debug:
-            print "     Adding", segment
-            self.bst.print_tree()
+        #if self.debug:
+        #    print "     Adding", segment
+        #    self.bst.print_tree()
 
         before = self.bst.find_previous(segment, self.debug)
         after = self.bst.find_next(segment, self.debug)
@@ -1362,53 +1362,53 @@ class TermDAG(object):
             x, y = self.crossings[(before.name, after.name)]
             self.pqueue.remove((y, x, before.name, after.name))
             heapq.heapify(self.pqueue)
-            if self.debug:
-                print " -- removing (", y, ",", x, ",", before, after,")"
+            #if self.debug:
+            #    print " -- removing (", y, ",", x, ",", before, after,")"
         bcross, x, y = segment.intersect(before, self.debug)
         if bcross and (y, x, before.name, segment.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, before.name, segment.name))
             self.crossings[(before.name, segment.name)] = (x, y)
-            if self.debug:
-                print " -- pushing (", y, ",", x, ",", before, segment, ")"
+            #if self.debug:
+            #    print " -- pushing (", y, ",", x, ",", before, segment, ")"
         across, x, y = segment.intersect(after, self.debug)
         if across and (y, x, segment.name, after.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, segment.name, after.name))
             self.crossings[(segment.name, after.name)] = (x, y)
-            if self.debug:
-                print " -- pushing (", y, ",", x, ",", segment, after,")"
+            #if self.debug:
+            #    print " -- pushing (", y, ",", x, ",", segment, after,")"
 
-        if self.debug and (before or after):
-            print "CHECK: ", bcross, across, segment, before, after
-            self.print_pqueue()
+        #if self.debug and (before or after):
+        #    print "CHECK: ", bcross, across, segment, before, after
+        #    self.print_pqueue()
 
 
     def bottom_endpoint(self, segment):
-        if self.debug:
-            print "     Bottom Check", segment
-            self.bst.print_tree()
+        #if self.debug:
+        #    print "     Bottom Check", segment
+        #    self.bst.print_tree()
         before = self.bst.find_previous(segment, self.debug)
         after = self.bst.find_next(segment, self.debug)
 
         self.bst.delete(segment, self.debug)
 
-        if self.debug:
-            print "     Deleting", segment
-            self.bst.print_tree()
+        #if self.debug:
+        #    print "     Deleting", segment
+        #    self.bst.print_tree()
 
         if before:
             bacross, x, y = before.intersect(after, self.debug)
             if bacross and y > segment.y1 and (y, x, before.name, after.name) not in self.pqueue:
                 heapq.heappush(self.pqueue, (y, x, before.name, after.name))
                 self.crossings[(before.name, after.name)] = (x, y)
-                if self.debug:
-                    print " -- adding (", y, ",", x, ",", before, after,")"
-                    self.print_pqueue()
+                #if self.debug:
+                #    print " -- adding (", y, ",", x, ",", before, after,")"
+                #    self.print_pqueue()
 
 
     def crossing(self, c1, c2, segment1, segment2):
-        if self.debug:
-            print "     Crossing check", c1, c2, segment1, segment2
-            self.bst.print_tree()
+        #if self.debug:
+        #    print "     Crossing check", c1, c2, segment1, segment2
+        #    self.bst.print_tree()
 
         # Not sure I need this check. I think I've always been putting them in
         # the right order.
@@ -1428,16 +1428,16 @@ class TermDAG(object):
 
         #before = self.bst.find_previous(first, self.debug)
         after = self.bst.find_next(second, self.debug)
-        if self.debug:
-            print "       before:", before
-            print "        after:", after
+        #if self.debug:
+        #    print "       before:", before
+        #    print "        after:", after
 
         # Now do the swap
         self.bst.swap(first, second, c1, c2)
 
-        if self.debug:
-            print "     Swapping", first, second
-            self.bst.print_tree()
+        #if self.debug:
+        #    print "     Swapping", first, second
+        #    self.bst.print_tree()
 
         # Remove crossings between first/before and second/after
         # from the priority queue
@@ -1446,15 +1446,15 @@ class TermDAG(object):
             if (y, x, second.name, after.name) in self.pqueue:
                 self.pqueue.remove((y, x, second.name, after.name))
                 heapq.heapify(self.pqueue)
-                if self.debug:
-                    print " -- removing (", y, ",", x, ",", second, after, ")"
+                #if self.debug:
+                #    print " -- removing (", y, ",", x, ",", second, after, ")"
         if before and first and (before.name, first.name) in self.crossings:
             x, y = self.crossings[(before.name, first.name)]
             if (y, x, before.name, first.name) in self.pqueue:
                 self.pqueue.remove((y, x, before.name, first.name))
                 heapq.heapify(self.pqueue)
-                if self.debug:
-                    print " -- pushing (", y, ",", x, ",", before, first, ")"
+                #if self.debug:
+                #    print " -- pushing (", y, ",", x, ",", before, first, ")"
 
         # Add possible new crossings
         if before:
@@ -1462,17 +1462,17 @@ class TermDAG(object):
             if cross1 and y > c2 and (y, x, before.name, second.name) not in self.pqueue:
                 heapq.heappush(self.pqueue, (y, x, before.name, second.name))
                 self.crossings[(before.name, second.name)] = (x, y)
-                if self.debug:
-                    print " -- pushing (", y, ",", x, ",", before, second,")"
+                #if self.debug:
+                #    print " -- pushing (", y, ",", x, ",", before, second,")"
         cross2, x, y = first.intersect(after, self.debug)
         if cross2 and y > c2 and (y, x, first.name, after.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, first.name, after.name))
             self.crossings[(first.name, after.name)] = (x, y)
-            if self.debug:
-                print " -- pushing (", y, ",", x, ",", first, after, ")"
+            #if self.debug:
+            #    print " -- pushing (", y, ",", x, ",", first, after, ")"
 
-        if self.debug:
-            self.print_pqueue()
+        #if self.debug:
+        #    self.print_pqueue()
 
 
 class TermBST(object):
@@ -1546,9 +1546,9 @@ class TermBST(object):
 
     def find_next(self, segment, debug = False):
         node = segment.BSTNode
-        if node is None and debug:
-            print "ERROR, could not find", segment, " in find_next"
-            return None
+        #if node is None and debug:
+        #    print "ERROR, could not find", segment, " in find_next"
+        #    return None
         successor = node.right
         last = successor
         while successor:
@@ -1574,9 +1574,9 @@ class TermBST(object):
         node = segment.BSTNode
         segment.BSTNode = None
         if node is None:
-            if debug:
-                print "ERROR, could not find", segment, "in delete"
-                self.print_tree()
+            #if debug:
+            #    print "ERROR, could not find", segment, "in delete"
+            #   self.print_tree()
             return
 
         replacement = None
@@ -1607,9 +1607,9 @@ class TermBST(object):
         elif node.parent.right == node:
             node.parent.right = replacement
         else:
-            if debug:
-                print "ERROR, parenting error on", segment, "in delete"
-                self.print_tree()
+            #if debug:
+            #    print "ERROR, parenting error on", segment, "in delete"
+            #    self.print_tree()
             return
 
         if replacement:
@@ -1787,9 +1787,9 @@ class TermSegment(object):
         initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1),
             self.pdiff)
 
-        if debug:
-            print " - Intersecting", self, other, self.pdiff, other.pdiff, \
-                diffcross, other.x1, self.x1, other.y1, self.y1, initcross
+        #if debug:
+        #    print " - Intersecting", self, other, self.pdiff, other.pdiff, \
+        #        diffcross, other.x1, self.x1, other.y1, self.y1, initcross
 
         if diffcross == 0 and initcross == 0: # Co-linear
             # Impossible for our purposes -- we do not count intersection at
@@ -1802,14 +1802,14 @@ class TermSegment(object):
         else: # intersection!
             offset = initcross / diffcross
             offset2 = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), other.pdiff) / diffcross
-            if debug:
-                print " - offsets are", offset, offset2
+            #if debug:
+            #    print " - offsets are", offset, offset2
 
             if offset > 0 and offset < 1 and offset2 > 0 and offset2 < 1:
                 xi = other.x1 + offset * other.pdiff[0]
                 yi = other.y1 + offset * other.pdiff[1]
-                if debug:
-                    print " - points are:", xi, yi
+                #if debug:
+                #    print " - points are:", xi, yi
                 return (True, xi, yi)
             return (False, 0, 0)
 

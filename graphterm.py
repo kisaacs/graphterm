@@ -25,6 +25,12 @@ class TermDAG(object):
         self.row_names = dict()
 
         self.TL = None
+        self.placers = set()
+
+        self.RIGHT = 0
+        self.DOWN_RIGHT = 1
+        self.DOWN_LEFT = 2
+        self.LEFT = 3
 
         self.layout = False
         self.debug = False
@@ -178,6 +184,8 @@ class TermDAG(object):
         # Convert Tulip layout to something we can manipulate for both nodes
         # and links.
         maxy = -1e9
+        self.min_tulip_x = 1e9
+        self.max_tulip_x = -1e9
         for node in self._nodes.values():
             coord = viewLayout.getNodeValue(node.tulipNode)
             node._x = coord[0]
@@ -189,6 +197,8 @@ class TermDAG(object):
             if coord[1] > maxy:
                 maxy = coord[1]
                 self.name = node.name
+            self.max_tulip_x = max(self.max_tulip_x, coord[0])
+            self.min_tulip_x = min(self.min_tulip_x, coord[0])
 
         segmentID = 0
         for link in self._links:
@@ -212,13 +222,16 @@ class TermDAG(object):
                 if (coord[0], coord[1]) in coord_to_node:
                     placer = coord_to_node[(coord[0], coord[1])]
                     segment.end = placer
+                    placer.add_in_segment(segment)
                 else:
                     placer = TermNode("", None, False)
+                    self.placers.insert(placer)
                     coord_to_node[(coord[0], coord[1])] = placer
                     coord_to_placer[(coord[0], coord[1])] = placer
                     placer._x = coord[0]
                     placer._y = coord[1]
                     segment.end = placer
+                    placer.add_in_segment(segment)
 
                 last = (coord[0], coord[1])
 
@@ -260,16 +273,57 @@ class TermDAG(object):
             crossings_points[v].add(k[1])
             self.segment_ids[k[0]].addCrossing(k[1], v)
             self.segment_ids[k[1]].addCrossing(k[0], v)
-            crossed_segments.insert(k[0])
-            crossed_segments.insert(k[1])
+            #crossed_segments.insert(k[0])
+            #crossed_segments.insert(k[1])
 
-        for name in crossed_segments:
-            self.segment_ids[name].defineCrossingHeights()
+        for placer in self.placers:
+            placer.findInExtents(self.min_tulip_x, self.max_tulip_x)
 
-        for v, k in crossings_points.items():
+
+        #for name in crossed_segments:
+        #    if self.segment_ids[name].extent:
+        #        self.segment_ids[name].defineCrossingHeights()
+
+
+        # For each crossing, figure out if the end point of either already has
+        # a set of height for that y value. Cases:
+        # Neither has one: proceed as normal
+        # One has one: shift the crossing to that y value
+        # More than one has them: Ignore for now
+        for k, v in self.crossings_points.items();
             x, y = v
-            weighted_y = y
+            special_heights = list()
             for name in k:
+                segment  = self.segment_ids[name]
+                if segment.y1 in segment.end.crossing_heights:
+                    special_heights.append(segment.end.crossing_heights[segment.y1])
+
+            placer_y = y
+            if len(special_heights) > 1:
+                print "Special heights are", special_heights
+                for name in k:
+                    print " ---", self.segment_ids[name]
+                continue
+            elif len(special_heights) == 1:
+                placer_y = special_heights[0]
+
+            # Get placer
+            if (x,placer_y) in coord_to_node:
+                placer = coord_to_node[(x,placer_y)]
+            else
+                placer = TermNode('', None, False)
+                placer._x = x
+                placer._y = placer_y
+                coord_to_node[(x,placer_y)] = placer
+                coord_to_placer[(x,placer_y)] = placer
+
+            # Create segment break
+            for name in k:
+                segment = self.segment_ids[name]
+                new_segment = segment.split(placer)
+                segments.add(new_segment)
+            xset.add(x)
+            yset.add(placer_y)
 
 
         #for v, k in crossings_points.items():
@@ -1264,25 +1318,6 @@ class TermDAG(object):
            negative values. We think of this as just having the DAG
            upside down and sweeping from top to bottom.
         """
-        #segments = []
-        #segments.append(TermSegment(-33.5, -3.5, -24.5, -6, 'cc'))
-        #segments.append(TermSegment(-27.5, -3.5, -30.5, -6, 'de'))
-        #segments.append(TermSegment(-27.5, -3.5, -24.5, -6, 'dc'))
-        #segments.append(TermSegment(-27.5, -3.5, -18.5, -6, 'dl'))
-        #segments.append(TermSegment(-27.5, -3.5, -12.5, -6, 'db'))
-        #segments.append(TermSegment(-22.5, -3.5, -24.5, -6, 'ac'))
-        #segments.append(TermSegment(5.5, -3.5, -24.5, -6, 'uc'))
-        #segments.append(TermSegment(-18.5, -3.5, -18.5, -6, 'cl'))
-        #segments.append(TermSegment(-12.5, -3.5, -12.5, -6, 'ab'))
-        #segments.append(TermSegment(11.5, -3.5, -12.5, -6, 'ub'))
-        #segments.append(TermSegment(-12.5, -3.5, -6.5, -6, 'am'))
-        #segments.append(TermSegment(-6.5, -3.5, -6.5, -6, 'cm'))
-        #segments.append(TermSegment(17.5, -3.5, -6.5, -6, 'um'))
-        #segments.append(TermSegment(-0.5, 0, -0.5, -9.5, 'ce'))
-        #for segment in segments:
-        #    self.segment_ids[segment.name] = segment
-
-
         self.bst = TermBST() # BST of segments crossing L
         self.pqueue = [] # Priority Queue of potential future events
         self.crossings = dict() # Will be (segment1, segment2) = (x, y)
@@ -1480,7 +1515,7 @@ class TermBST(object):
 
 
     def find_previous(self, segment, debug = False):
-        node = segment.BSTNode 
+        node = segment.BSTNode
         if node is None and debug:
             print "ERROR, could not find", segment, " in find_previous"
             return None
@@ -1617,7 +1652,7 @@ class SplitGroup(object):
         self.destination = destination
 
         self.segments = set()
-        self.height = None
+        self.crossing_points = dict() # x -> y
 
 class TermSegment(object):
     """A straight-line portion of a drawn poly-line in the graph rendering."""
@@ -1629,6 +1664,7 @@ class TermSegment(object):
         self.y2 = y2
         self.name = name
         self.BSTNode = None
+        self.vertical = (self.y1 == self.y2)
 
         # Initial sort order for crossing detection
         # Since y is negative, in normal sort order, we start from there
@@ -1649,18 +1685,24 @@ class TermSegment(object):
         # From splits
         self.children = []
         self.origin = self
-        self.split_groups = dict() # (row, dest-segment) -> SplitGroup
+        self.extent = True # will be considered for crossing
+        self.split_groups = dict() # (y, dest-segment-name) -> SplitGroup
+        self.vertical_crossing_count = 0
+        self.crossing_count = 0
 
 
     def addCrossing(self, other, point):
-        starty = other.y1
-        destination = (other.x2, other.y2)
-        if (starty, destination) in self.split_groups:
-            group = self.split_groups[(starty, destination)]
-        else:
-            group = SplitGroup(starty, destination)
-            self.split_groups[(starty, destination)] = gruop
-        group.segments.insert((other, point))
+        self.crossing_count += 1
+        #starty = other.y1
+        #destination = (other.x2, other.y2)
+        #if (starty, destination) in self.split_groups:
+        #    group = self.split_groups[(starty, destination)]
+        #else:
+        #    group = SplitGroup(starty, destination)
+        #    self.split_groups[(starty, destination)] = gruop
+        #group.segments.insert((other, point))
+        if other.vertical:
+            self.vertical_crossing_count += 1
 
 
     def defineCrossingHeights(self):
@@ -1836,12 +1878,63 @@ class TermNode(object):
         self.coord = (-1, -1)
 
         self.real = real # Real node or segment connector?
+        self.in_segments = list()
+        self.in_left = dict()
+        self.in_right = dict()
+        self.crossings = dict() # y -> list of (segment, point)
+        self.crossing_counts = dict() # y -> # of crossings from in segments
+        self.vertical_in = None
+        self.crossing_heights = dict() # y -> where the crossing should occur
 
     def add_in_link(self, link):
         self._in_links.append(link)
 
     def add_out_link(self, link):
         self._out_links.append(link)
+
+    def add_in_segment(self, segment):
+        if segment.y1 == segment.y2:
+            self.vertical_in = segment
+        self._in_segments.append(segment)
+
+    def add_crossing(self, segment, point):
+        y = segment.y1
+        if y not in self.crossings:
+            self.crossings[y] = list()
+        self.crossings[y].append((segment, point))
+
+    def findInExtents(self, min_x, max_x):
+        for segment in self._in_segments():
+            y = segment.y1
+            x = segment.x1
+            if y not in self.crossing_counts:
+                self.crossing_counts[y] = 0
+            self.crossing_counts[y] += segment.vertical_crossing_counts
+            if x < self._x: # left
+                if y not in self.in_left:
+                    self.in_left[y] = segment
+                elif self.in_left[y].x1 > x:
+                    self.in_left[y].extent = False
+                    self.in_left[y] = segment
+                else:
+                    segment.extent = False
+            elif x > self._x: # right
+                if y not in self.in_right:
+                    self.in_right[y] = segment
+                elif self.in_right[y].x1 < x:
+                    self.in_right[y].extent = False
+                    self.in_right[y] = segment
+                else:
+                    segment.extent = False
+
+        # We set different offsets for different x values based on the
+        # min and max x -- we never go higher than half way up the y value
+        for y, count in self.crossing_counts.items():
+            if count > 0:
+                normalized = 0.5 * (self._x - min_x) / (max_x - min_x)
+                offset = (self._y - y) * normalized
+                self.crossing_heights[y] = self._y - ofset
+
 
     def skeleton_copy(self):
         cpy = TermNode(self.name, None, self.real)

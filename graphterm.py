@@ -251,28 +251,42 @@ class TermDAG(object):
             #return
 
         # Consolidate crossing points
-        crossings_points = dict()
-        for k, v in self.crossings.items():
+        crossings_points = dict() # (x, y) -> set of segments
+        crossed_segments = set()
+        for k, v in self.crossings.items(): # crossings is (seg1, seg2) -> (x, y)
             if v not in crossings_points:
                 crossings_points[v] = set()
             crossings_points[v].add(k[0])
             crossings_points[v].add(k[1])
+            self.segment_ids[k[0]].addCrossing(k[1], v)
+            self.segment_ids[k[1]].addCrossing(k[0], v)
+            crossed_segments.insert(k[0])
+            crossed_segments.insert(k[1])
+
+        for name in crossed_segments:
+            self.segment_ids[name].defineCrossingHeights()
 
         for v, k in crossings_points.items():
-            if self.debug:
-                print k, v
             x, y = v
-            placer = TermNode('', None, False)
-            placer._x = x
-            placer._y = y
-            coord_to_node[(x,y)] = placer
-            coord_to_placer[(x,y)] = placer
+            weighted_y = y
             for name in k:
-                segment = self.segment_ids[name]
-                new_segment = segment.split(placer)
-                segments.add(new_segment)
-            xset.add(x)
-            yset.add(y)
+
+
+        #for v, k in crossings_points.items():
+        #    if self.debug:
+        #        print k, v
+        #    x, y = v
+        #    placer = TermNode('', None, False)
+        #    placer._x = x
+        #    placer._y = y
+        #    coord_to_node[(x,y)] = placer
+        #    coord_to_placer[(x,y)] = placer
+        #    for name in k:
+        #        segment = self.segment_ids[name]
+        #        new_segment = segment.split(placer)
+        #        segments.add(new_segment)
+        #    xset.add(x)
+        #    yset.add(y)
 
         # Based on the tulip layout, do the following:
         xsort = sorted(list(xset))
@@ -1596,6 +1610,15 @@ class TermBSTNode(object):
         self.right = None
         self.parent = None
 
+
+class SplitGroup(object):
+    def __init__(self, starty, destination):
+        self.starty = starty
+        self.destination = destination
+
+        self.segments = set()
+        self.height = None
+
 class TermSegment(object):
     """A straight-line portion of a drawn poly-line in the graph rendering."""
 
@@ -1626,6 +1649,28 @@ class TermSegment(object):
         # From splits
         self.children = []
         self.origin = self
+        self.split_groups = dict() # (row, dest-segment) -> SplitGroup
+
+
+    def addCrossing(self, other, point):
+        starty = other.y1
+        destination = (other.x2, other.y2)
+        if (starty, destination) in self.split_groups:
+            group = self.split_groups[(starty, destination)]
+        else:
+            group = SplitGroup(starty, destination)
+            self.split_groups[(starty, destination)] = gruop
+        group.segments.insert((other, point))
+
+
+    def defineCrossingHeights(self):
+        for k, group in self.split_groups.items():
+            starty, destination = k
+            miny = group.segments[0][1][1]
+            for segment in group.segments:
+                miny = min(miny, segment[1][1]) # point[1] -- y coordinate)
+            group.height = miny
+
 
     def for_segment_sort(self):
         xlen = abs(self.x1 - self.x2)
@@ -1646,7 +1691,7 @@ class TermSegment(object):
            Note the new segment is always the second part (closer to the sink).
         """
 
-        # The one we are splitting from -- may have been updated by a prevoius split
+        # The one we are splitting from -- may have been updated by a previous split
         splitter = self
         if node._y > self.y1 or node._y < self.y2:
             for child in self.origin.children:

@@ -35,7 +35,7 @@ class TermDAG(object):
         self.layout = False
         self.debug = False
         self.do_interactive = False
-        self.output_tulip = True
+        self.output_tulip = False
         self.name = 'default'
 
         self.left_offset = 0
@@ -295,21 +295,21 @@ class TermDAG(object):
             special_heights = list()
             for name in k:
                 segment = self.segment_ids[name]
-                print 'Testing point', v, 'for segment', segment, 'with height', segment.end.crossing_heights
-                print '  Is', segment.y1, 'there?'
+                #print 'Testing point', v, 'for segment', segment, 'with height', segment.end.crossing_heights
+                #print '  Is', segment.y1, 'there?'
                 if segment.y1 in segment.end.crossing_heights:
-                    print '       appending'
+                    #print '       appending'
                     special_heights.append(segment.end.crossing_heights[segment.y1])
 
             placer_y = y
-            print "Length of spcil heights is", len(special_heights)
+            #print "Length of spcil heights is", len(special_heights)
             if len(special_heights) == 1:
-                print 'setting placer y to', special_heights[0]
+                #print 'setting placer y to', special_heights[0]
                 placer_y = special_heights[0]
             elif len(special_heights) > 1:
-                print "Special heights are", special_heights
-                for name in k:
-                    print " ---", self.segment_ids[name]
+                #print "Special heights are", special_heights
+                #for name in k:
+                #    print " ---", self.segment_ids[name]
                 continue
 
             # Get placer
@@ -1932,9 +1932,9 @@ class TermNode(object):
 
         # We set different offsets for different x values based on the
         # min and max x -- we never go higher than half way up the y value
-        print "crossings for", self.name, self._x, self._y
+        #print "crossings for", self.name, self._x, self._y
         for y, count in self.crossing_counts.items():
-            print "   ", y, count
+            #print "   ", y, count
             if count > 0:
                 normalized = 0.5 * (self._x - min_x) / (max_x - min_x)
                 offset = (self._y - y) * normalized

@@ -225,7 +225,7 @@ class TermDAG(object):
                     placer.add_in_segment(segment)
                 else:
                     placer = TermNode("", None, False)
-                    self.placers.insert(placer)
+                    self.placers.add(placer)
                     coord_to_node[(coord[0], coord[1])] = placer
                     coord_to_placer[(coord[0], coord[1])] = placer
                     placer._x = coord[0]
@@ -265,14 +265,14 @@ class TermDAG(object):
 
         # Consolidate crossing points
         crossings_points = dict() # (x, y) -> set of segments
-        crossed_segments = set()
+        #crossed_segments = set()
         for k, v in self.crossings.items(): # crossings is (seg1, seg2) -> (x, y)
             if v not in crossings_points:
                 crossings_points[v] = set()
             crossings_points[v].add(k[0])
             crossings_points[v].add(k[1])
-            self.segment_ids[k[0]].addCrossing(k[1], v)
-            self.segment_ids[k[1]].addCrossing(k[0], v)
+            self.segment_ids[k[0]].addCrossing(self.segment_ids[k[1]], v)
+            self.segment_ids[k[1]].addCrossing(self.segment_ids[k[0]], v)
             #crossed_segments.insert(k[0])
             #crossed_segments.insert(k[1])
 
@@ -290,11 +290,11 @@ class TermDAG(object):
         # Neither has one: proceed as normal
         # One has one: shift the crossing to that y value
         # More than one has them: Ignore for now
-        for k, v in self.crossings_points.items();
+        for v, k in crossings_points.items():
             x, y = v
             special_heights = list()
             for name in k:
-                segment  = self.segment_ids[name]
+                segment = self.segment_ids[name]
                 if segment.y1 in segment.end.crossing_heights:
                     special_heights.append(segment.end.crossing_heights[segment.y1])
 
@@ -310,7 +310,7 @@ class TermDAG(object):
             # Get placer
             if (x,placer_y) in coord_to_node:
                 placer = coord_to_node[(x,placer_y)]
-            else
+            else:
                 placer = TermNode('', None, False)
                 placer._x = x
                 placer._y = placer_y
@@ -1878,7 +1878,7 @@ class TermNode(object):
         self.coord = (-1, -1)
 
         self.real = real # Real node or segment connector?
-        self.in_segments = list()
+        self._in_segments = list()
         self.in_left = dict()
         self.in_right = dict()
         self.crossings = dict() # y -> list of (segment, point)
@@ -1904,12 +1904,12 @@ class TermNode(object):
         self.crossings[y].append((segment, point))
 
     def findInExtents(self, min_x, max_x):
-        for segment in self._in_segments():
+        for segment in self._in_segments:
             y = segment.y1
             x = segment.x1
             if y not in self.crossing_counts:
                 self.crossing_counts[y] = 0
-            self.crossing_counts[y] += segment.vertical_crossing_counts
+            self.crossing_counts[y] += segment.vertical_crossing_count
             if x < self._x: # left
                 if y not in self.in_left:
                     self.in_left[y] = segment

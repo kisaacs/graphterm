@@ -936,6 +936,39 @@ class TermDAG(object):
             else:
                 self.qpad_pos_y = 0
 
+
+    def center_xy(self, stdscr, x, y):
+        ideal_corner_x = self.pad_corner_x
+        ideal_corner_y = self.pad_corner_y
+        move_x = False
+        move_y = False
+
+        if x < self.pad_corner_x or x > self.pad_corner_x + self.width:
+            ideal_corner_x = max(0, min(x - self.width / 2, self.gridsize[1] - self.width))
+            move_x = True
+        if y < self.pad_corner_y or y > self.pad_corner_y + self.height:
+            ideal_corner_y = max(0, min(y - self.height / 2, self.gridsize[0] - self.height))
+            move_y = True
+
+        while move_x or move_y:
+            if move_x:
+                if self.pad_corner_x < ideal_corner_x:
+                    self.scroll_left()
+                else:
+                    self.scroll_right()
+                if self.pad_corner_x == ideal_corner_x:
+                    move_x = False
+            if move_y:
+                if self.pad_corner_y < ideal_corner_y:
+                    self.scroll_up()
+                else:
+                    self.scroll_down()
+                if self.pad_corner_y == ideal_corner_y:
+                    move_y = False
+            stdscr.refresh()
+            self.refresh_pad()
+
+
     def scroll_up(self):
         if self.pad_corner_y + (self.pad_extent_y - self.pad_pos_y) < self.gridsize[0]:
             self.pad_corner_y += 1
@@ -1098,7 +1131,7 @@ class TermDAG(object):
                     self.toggle_help(stdscr)
                     stdscr.move(self.height - 1, 0)
 
-                # Scroll (TODO: Trackpad scroll)
+                # Scroll 
                 elif ch == ord('s') or ch == curses.KEY_DOWN or ch == 40:
                     self.scroll_up()
                     stdscr.refresh()
@@ -1213,6 +1246,10 @@ class TermDAG(object):
                     stdscr.addstr(ch)
                     stdscr.refresh()
 
+
+
+
+
     def select_node(self, stdscr, name, offset):
         # Clear existing highlights
         self.redraw_default(stdscr, offset)
@@ -1220,6 +1257,9 @@ class TermDAG(object):
         if name in self._nodes:
             self.highlight_node(stdscr, name, offset, 7) # Cyan
             self.highlight_neighbors(stdscr, name, offset)
+
+            node = self._nodes[name]
+            self.center_xy(stdscr, self.left_offset + node._col, node._row)
             return name
 
         return ''

@@ -110,10 +110,15 @@ class TermDAG(object):
         for i in range(len(self.hpad_cmds)):
             self.hpad_max_cmd = max(len(self.hpad_cmds[i]), self.hpad_max_cmd)
             self.hpad_max_msg = max(len(self.hpad_msgs[i]), self.hpad_max_msg)
+        hpad_collapse_max_cmd = 0
+        hpad_collapse_max_msg = 0
+        for i in range(len(self.hpad_default_cmds)):
+            hpad_collapse_max_cmd = max(len(self.hpad_default_cmds[i]), hpad_collapse_max_cmd)
+            hpad_collapse_max_msg = max(len(self.hpad_default_msgs[i]), hpad_collapse_max_msg)
 
         # The 2 is for the prefix an suffix space
         self.hpad_max_x = self.hpad_max_cmd + self.hpad_max_msg + len(' - ') + 2
-
+        self.hpad_max_collapse_x = hpad_collapse_max_msg + hpad_collapse_max_cmd + len(' - ') + 2
 
     def add_node(self, name):
         if len(self._nodes.keys()) == 0:
@@ -1006,8 +1011,8 @@ class TermDAG(object):
 
     def collapse_help(self):
         self.hpad.clear()
-        self.hpad_extent_x = self.hpad_max_x + 1
-        self.hpad_extent_y = len(self.hpad_default_cmds) + 1
+        self.hpad_extent_x = self.hpad_max_collapse_x # + 1
+        self.hpad_extent_y = len(self.hpad_default_cmds) # + 1
         self.hpad_pos_x = self.width - self.hpad_extent_x - 1
         self.hpad_collapsed = True
         for i in range(len(self.hpad_default_cmds)): # TODO: Use zip
@@ -1018,8 +1023,8 @@ class TermDAG(object):
 
     def expand_help(self):
         self.hpad.clear()
-        self.hpad_extent_y = self.hpad_max_y + 1
-        self.hpad_extent_x = self.hpad_max_x + 1
+        self.hpad_extent_y = self.hpad_max_y # + 1
+        self.hpad_extent_x = self.hpad_max_x # + 1
         self.hpad_pos_x = self.width - self.hpad_extent_x - 1
         self.hpad_collapsed = False
         for i in range(len(self.hpad_cmds)): # TODO: Use zip

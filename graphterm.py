@@ -1214,7 +1214,7 @@ class TermDAG(object):
             self.redraw_default(stdscr, offset)
 
         if name in self._nodes:
-            self.highlight_node(stdscr, name, offset, self.select_color + curses.COLORS) # Cyan
+            self.highlight_node(stdscr, name, offset, self.select_color + self.maxcolor, doPad) # Cyan
             self.highlight_neighbors(stdscr, name, offset)
 
             node = self._nodes[name]

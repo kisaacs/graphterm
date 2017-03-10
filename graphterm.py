@@ -586,102 +586,52 @@ class TermDAG(object):
             left_bracket = ''
             right_bracket = ''
             left_nodes = []
-            left_hang = None
             right_name = ''
             left_name = ''
 
-            # Special case: First node
-            first = nodes[0]
-            if self.place_label_right(first):
-                if self.debug:
-                    print 'placing', first.name, first.label_pos, 'on the right'
-            elif self.place_label_left(first):
-                if first._col == self.row_first_mark[row]:
-                    left_pos = len(first.name) + 1
-                    left_name = first.name
-                if self.debug:
-                    print 'placing', first.name, first.label_pos, 'on the left'
-            else:
-                first.use_offset = True
-                #if first._col < half_row:
-                #    first_len = len(first.name) + 1
-                #    first.label_pos = left_pos + first_len
-                #    left_pos += first_len
-                #    left_hang = first
-                #    left_name = first.name
-                #else:
-                first.label_pos = right_pos # Don't add one, already built into brackets
-                right_pos += len(first.name)
-                right_name = first.name
-                if self.debug:
-                    print 'placing', first.name, first.label_pos, 'as hang'
-
             # Special case: Last node
-            if len(nodes) > 1:
-                last = nodes[-1]
-                if self.place_label_right(last):
-                    if last._col == self.row_last_mark[row]:
-                        right_pos += len(last.name)
-                        right_name = last.name
+            last = nodes[-1]
+            if self.place_label_right(last):
+                if last._col == self.row_last_mark[row]:
+                    right_pos += len(last.name)
+                    right_name = last.name
+                if self.debug:
+                    print 'placing', last.name, last.label_pos, 'on the right'
+            elif not self.place_label_left(last):
+                if right_name == '':
+                    last.use_offset = True
+                    last.label_pos = right_pos
+                    right_pos += len(last.name)
+                    right_name = last.name
                     if self.debug:
-                        print 'placing', last.name, last.label_pos, 'on the right'
-                elif not self.place_label_left(last):
-                    if right_name == '':
-                        last.use_offset = True
-                        last.label_pos = right_pos
-                        right_pos += len(last.name)
-                        right_name = last.name
-                        if self.debug:
-                            print 'placing', last.name, last.label_pos, 'as right hang'
-                    else:
-                        left_bracket, right_bracket, left_pos, right_pos \
-                            = self.place_label_bracket(last, left_bracket, right_bracket,
-                                left_pos, right_pos, left_nodes, half_row)
-                        if self.debug:
-                            print 'placing', last.name, last.label_pos, 'in bracket'
+                        print 'placing', last.name, last.label_pos, 'as right hang'
+                else:
+                    left_bracket, right_bracket, left_pos, right_pos \
+                        = self.place_label_bracket(last, left_bracket, right_bracket,
+                            left_pos, right_pos, left_nodes, half_row)
+                    if self.debug:
+                        print 'placing', last.name, last.label_pos, 'in bracket'
 
             # Draw the rest 
-            if len(nodes) > 2:
-                for node in nodes[1:-1]:
+            if len(nodes) > 1:
+                for node in nodes[0:-1]:
                     if self.debug:
                         print 'handling', node.name
                     if not self.place_label_right(node) and not self.place_label_left(node):
-                        #if node._col >= half_row and right_name == '':
-                        #    if self.debug:
-                        #        print 'Placing', node.name, 'on the right'
                         if right_name == '':
                             node.use_offset = True
                             node.label_pos = right_pos
                             right_pos += len(node.name)
                             right_name = node.name
-                        #elif node._col < half_row and left_name == '':
-                        #    if self.debug:
-                        #        print 'Placing', node.name, 'on the left'
-                        #    node.use_offset = True
-                        #    node_len = len(node.name) + 1
-                        #    node.label_pos = left_pos + (node_len)
-                        #    left_pos += node_len
-                        #    left_hang = node
-                        #    left_name = node.name
                         else:
                             left_bracket, right_bracket, left_pos, right_pos \
                                 = self.place_label_bracket(node, left_bracket, right_bracket,
                                     left_pos, right_pos, left_nodes, half_row)
 
 
-            # if left_bracket != '':
-            #    left_bracket += ' ] '
-            #    left_pos += 3
             if right_bracket != '':
                 right_bracket += ' ]'
                 right_pos += 2
-
-            # if self.debug:
-            #    print 'left bracket', left_bracket, 'right_bracket', right_bracket
-            # Absolute positionining of the left hanging label
-            if left_hang:
-                left_hang.use_offset = False
-                left_hang.label_pos = self.left_offset + self.row_first_mark[row] - len(left_hang.name)
 
             row_left_offset = self.left_offset + self.row_first_mark[row] - left_pos
             #- len(left_name) - len(left_bracket)
@@ -712,10 +662,6 @@ class TermDAG(object):
 
             start = row_left_offset
             left_names = left_bracket
-            if left_hang:
-                left_names += ' ' + left_name
-            if self.debug:
-                print 'placing left names: ', left_names
             for ch in left_names:
                 self.grid[row][start] = ch
                 start += 1

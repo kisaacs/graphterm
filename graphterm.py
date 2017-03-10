@@ -1215,10 +1215,11 @@ class TermDAG(object):
 
         if name in self._nodes:
             self.highlight_node(stdscr, name, offset, self.select_color + self.maxcolor, doPad) # Cyan
-            self.highlight_neighbors(stdscr, name, offset)
+            self.highlight_neighbors(stdscr, name, offset, doPad)
 
-            node = self._nodes[name]
-            self.center_xy(stdscr, self.left_offset + node._col, node._row)
+            if doPad:
+                node = self._nodes[name]
+                self.center_xy(stdscr, self.left_offset + node._col, node._row)
             return name
 
         return ''

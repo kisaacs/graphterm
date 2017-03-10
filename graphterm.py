@@ -54,6 +54,14 @@ class TermDAG(object):
         self.width = 0
         self.offset = 0
 
+        self.maxcolor = 7
+        self.default_color = 0 # whatever is the true default
+        #self.select_color = 7 # cyan
+        #self.neighbor_color = 5 # blue
+        #self.default_color = 5 # whatever is the true default
+        self.select_color = 2 # red
+        self.neighbor_color = 2 # red
+
         self.initialize_help()
 
         self.qpad = None
@@ -61,17 +69,22 @@ class TermDAG(object):
             self.initialize_question()
 
     def log_character(self, ch):
-        self.logfile.write(str(unichr(ch)))
+        if isinstance(ch, unicode):
+            self.logfile.write(str(ch).decode('utf-8').encode('utf-8'))
+        elif isinstance(ch, int) and ch < 128:
+            self.logfile.write(str(unichr(ch)))
+        elif isinstance(ch, int):
+            self.logfile.write(str(ch).decode('utf-8').encode('utf-8'))
 
     def initialize_question(self):
         self.qpad_pos_x = 0
         self.qpad_pos_y = 0
         self.qpad_extent_x = len(self.question)
-        self.qpad_extent_y = 2
+        self.qpad_extent_y = 1
         self.qpad_corner_x = 0
         self.qpad_corner_y = 0
         self.qpad_max_x = self.qpad_extent_x + 1
-        self.qpad_max_y = 3
+        self.qpad_max_y = 2
 
     def initialize_help(self):
         self.hpad = None # Help Pad
@@ -737,7 +750,7 @@ class TermDAG(object):
                     and self.grid[y][x] == '|':
                     self.grid[y][x] = char
                 else:
-                    print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
+                    #print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
                     success = False
                     self.grid[y][x] = 'X'
             #if x > row_last[y]:
@@ -834,7 +847,11 @@ class TermDAG(object):
             if i >= start and i <= end:
                 if colors[i] != color:
                     color = colors[i]
-                    string += '\x1b[' + str(self.to_ansi_foreground(color)) + 'm'
+                    if color > self.maxcolor:
+                        string += '\x1b[' + str(self.to_ansi_foreground(color - self.maxcolor + 10))
+                    else:
+                        string += '\x1b[' + str(self.to_ansi_foreground(color))
+                    string += 'm'
                 string += ch
 
         string += '\x1b[0m'
@@ -1038,9 +1055,6 @@ class TermDAG(object):
         self.collapse_help()
         stdscr.refresh()
         self.refresh_pad()
-        self.refresh_hpad()
-        if self.qpad:
-            self.refresh_qpad()
         stdscr.move(self.height - 1, 0)
 
         command = ''
@@ -1057,9 +1071,6 @@ class TermDAG(object):
                 stdscr.clear()
                 stdscr.refresh()
                 self.refresh_pad()
-                self.refresh_hpad()
-                if selft.qpad:
-                    self.refresh_qpad()
                 stdscr.move(self.height - 1, 0)
             elif command == '': # Awaiting new Command
 
@@ -1197,13 +1208,10 @@ class TermDAG(object):
                     stdscr.addstr(ch)
                     stdscr.refresh()
 
-
-
-
-
-    def select_node(self, stdscr, name, offset):
+    def select_node(self, stdscr, name, offset, doPad = True):
         # Clear existing highlights
-        self.redraw_default(stdscr, offset)
+        if doPad:
+            self.redraw_default(stdscr, offset)
 
         if name in self._nodes:
             self.highlight_node(stdscr, name, offset, self.select_color + curses.COLORS) # Cyan
@@ -1215,40 +1223,43 @@ class TermDAG(object):
 
         return ''
 
-    def highlight_neighbors(self, stdscr, name, offset):
+    def highlight_neighbors(self, stdscr, name, offset, doPad = True):
         """We assume that the node in question is already highlighted."""
 
         node = self._nodes[name]
 
-        self.highlight_in_neighbors(stdscr, name, offset, self.highlight_full_connectivity)
-        self.highlight_out_neighbors(stdscr, name, offset, self.highlight_full_connectivity)
+        self.highlight_in_neighbors(stdscr, name, offset, self.highlight_full_connectivity, doPad)
+        self.highlight_out_neighbors(stdscr, name, offset, self.highlight_full_connectivity, doPad)
 
 
-    def highlight_in_neighbors(self, stdscr, name, offset, recurse):
+    def highlight_in_neighbors(self, stdscr, name, offset, recurse, doPad = True):
         node = self._nodes[name]
 
         for link in node._in_links:
             neighbor = self._nodes[link.source]
-            self.highlight_node(stdscr, neighbor.name, offset, 5)
-            self.highlight_segments(stdscr, link.segments, offset)
+            self.highlight_node(stdscr, neighbor.name, offset, self.neighbor_color, doPad)
+            self.highlight_segments(stdscr, link.segments, offset, doPad)
 
             if recurse:
-                self.highlight_in_neighbors(stdscr, link.source, offset, recurse)
+                self.highlight_in_neighbors(stdscr, link.source, offset, recurse, doPad)
 
 
-    def highlight_out_neighbors(self, stdscr, name, offset, recurse):
+    def highlight_out_neighbors(self, stdscr, name, offset, recurse, doPad = True):
         node = self._nodes[name]
 
         for link in node._out_links:
             neighbor = self._nodes[link.sink]
-            self.highlight_node(stdscr, neighbor.name, offset, 5)
-            self.highlight_segments(stdscr, link.segments, offset)
+            self.highlight_node(stdscr, neighbor.name, offset, self.neighbor_color, doPad)
+            self.highlight_segments(stdscr, link.segments, offset, doPad)
 
             if recurse:
-                self.highlight_out_neighbors(stdscr, link.sink, offset, recurse)
+                self.highlight_out_neighbors(stdscr, link.sink, offset, recurse, doPad)
 
 
-    def highlight_segments(self, stdscr, segments, offset):
+    def highlight_segments(self, stdscr, segments, offset, doPad = True):
+        if not doPad:
+            self.highlight_segments_printonly(segments, offset)
+            return
         for segment in segments:
             for i, coord in enumerate(segment.gridlist):
                 x, y, char, draw = coord
@@ -1275,9 +1286,36 @@ class TermDAG(object):
                     else:
                         self.pad.addch(y, x, 'X', curses.color_pair(5))
 
-    def highlight_node(self, stdscr, name, offset, color):
+    def highlight_segments_printonly(self, segments, offset):
+        for segment in segments:
+            for i, coord in enumerate(segment.gridlist):
+                x, y, char, draw = coord
+                x += self.left_offset
+                if not draw or char == '':
+                    continue
+                self.grid_colors[y][x] = self.neighbor_color
+                if char != self.grid[y][x]:
+                    if char == '_' and (self.grid[y][x] == '|'
+                        or self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
+                        segment.gridlist[i] = (x, y, char, False)
+                    elif (char == '|' or char == '/' or char == '\\') \
+                        and self.grid[y][x] == '_':
+                        self.grid[y][x] = char
+                    elif char == '|' and (self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
+                        segment.gridlist[i] = (x, y, char, False)
+                    elif (char == '/' or char == '\\') \
+                        and self.grid[y][x] == '|':
+                        self.grid[y][x] = char
+                    else:
+                        self.grid[y][x] = 'X'
+
+
+    def highlight_node(self, stdscr, name, offset, color, doPad = True):
         if name not in self._nodes:
             return ''
+        if not doPad:
+            self.highlight_node_printonly(name, offset, color)
+            return
 
         node = self._nodes[name]
         self.pad.addch(node._row, self.left_offset + node._col, 'o', curses.color_pair(color))
@@ -1291,6 +1329,18 @@ class TermDAG(object):
             self.grid_colors[node._row][label_offset + node.label_pos + i] = color
             self.pad.addch(node._row, label_offset + node.label_pos + i,
                 ch, curses.color_pair(color))
+
+        return name
+
+
+    def highlight_node_printonly(self, name, offset, color):
+        node = self._nodes[name]
+        self.grid_colors[node._row][self.left_offset + node._col] = color
+        label_offset = 0
+        if node.use_offset:
+            label_offset = self.row_last[node._row] + 2
+        for i, ch in enumerate(node.name):
+            self.grid_colors[node._row][label_offset + node.label_pos + i] = color
 
         return name
 
@@ -2496,6 +2546,7 @@ def interactive_helper(stdscr, graph):
     curses.start_color()
     can_color = curses.has_colors()
     curses.use_default_colors()
+    graph.maxcolor = curses.COLORS
     for i in range(0, curses.COLORS):
         curses.init_pair(i + 1, i, -1)
     graph.print_interactive(stdscr, can_color)

@@ -233,6 +233,7 @@ class TermDAG(object):
                     segmentID += 1
                     segments.add(segment)
                     segment_lookup[(last[0], last[1], coord[0], coord[1])] = segment
+                    segment.paths.add((link.source, link.sink))
                 link.segments.append(segment)
                 segment.links.append(link)
                 segment.start = coord_to_node[last]
@@ -261,6 +262,7 @@ class TermDAG(object):
                 segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
                     self._nodes[link.sink]._y, segmentID)
                 self.segment_ids[segmentID] = segment
+                segment.paths.add((link.source, link.sink))
                 segmentID += 1
                 segments.add(segment)
                 segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)] = segment
@@ -358,6 +360,9 @@ class TermDAG(object):
                 if self.debug:
                     print "Creating new segment from:", segment, "at", placer._x, placer._y
                 new_segment = segment.split(placer, bundle, self.debug)
+                if self.debug:
+                    print "    Split: ", segment
+                    print "  Created: ", new_segment
                 segments.add(new_segment)
             xset.add(x)
             yset.add(placer_y)
@@ -1752,6 +1757,8 @@ class TermSegment(object):
         self.vertical_crossing_count = 0
         self.crossing_count = 0
 
+        self.paths = set()
+
 
     def addCrossing(self, other, point):
         self.crossing_count += 1
@@ -1800,9 +1807,11 @@ class TermSegment(object):
         # the y value to totally define. 
         splitter = self
         if bundle:
-            if node._x > self.x1 or node._x < self.x2:
+            if debug:
+                print "Comparing: ", node._x, self.x1, self.x2
+            if node._x < self.x1 or node._x > self.x2:
                 for child in self.origin.children:
-                    if node._x < child.x1 and node._x > child.x2:
+                    if node._x > child.x1 and node._x < child.x2:
                         splitter = child
                         if debug:
                             print "Splitting on child (x):", child
@@ -1822,6 +1831,7 @@ class TermSegment(object):
         other.start = node
         other.end = splitter.end
         other.name = str(self.origin.name) + '-(' + str(node._x) + ')'
+        other.paths = self.paths.copy()
         splitter.end = node
         splitter.x2 = node._x
         splitter.y2 = node._y
@@ -1925,9 +1935,9 @@ class TermSegment(object):
 
         return False
 
-    def __repr__(self):
-        return "[%s, %s] - %s - TermSegment(%s, %s, %s, %s, %s)" % (self.b1, self.b2, self.name, self.x1, self.y1,
-            self.x2, self.y2, self.vertical)
+    def __str__(self):
+        return "%s - TermSegment(%s, %s, %s, %s) " % (self.name, self.x1, self.y1,
+            self.x2, self.y2) + str(self.paths)
 
     def __hash__(self):
         return hash(self.__repr__())

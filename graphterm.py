@@ -755,7 +755,7 @@ class TermDAG(object):
                     and self.grid[y][x] == '|':
                     self.grid[y][x] = char
                 else:
-                    #print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
+                    # print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
                     success = False
                     self.grid[y][x] = 'X'
             #if x > row_last[y]:
@@ -1809,12 +1809,20 @@ class TermSegment(object):
         if bundle:
             if debug:
                 print "Comparing: ", node._x, self.x1, self.x2
-            if node._x < self.x1 or node._x > self.x2:
-                for child in self.origin.children:
-                    if node._x > child.x1 and node._x < child.x2:
-                        splitter = child
-                        if debug:
-                            print "Splitting on child (x):", child
+            if self.x1 < self.x2:
+                if node._x < self.x1 or node._x > self.x2:
+                    for child in self.origin.children:
+                        if node._x > child.x1 and node._x < child.x2:
+                            splitter = child
+                            if debug:
+                                print "Splitting on child (x):", child
+            else:
+                if node._x < self.x2 or node._x > self.x1:
+                    for child in self.origin.children:
+                        if node._x > child.x2 and node._x < child.x1:
+                            splitter = child
+                            if debug:
+                                print "Splitting on child (x):", child
         else:
             if node._y > self.y1 or node._y < self.y2:
                 for child in self.origin.children:

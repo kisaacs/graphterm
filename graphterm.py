@@ -942,21 +942,25 @@ class TermDAG(object):
             self.refresh_pad()
 
 
-    def scroll_up(self):
+    def scroll_up(self, amount = 1):
         if self.pad_corner_y + (self.pad_extent_y - self.pad_pos_y) < self.gridsize[0]:
-            self.pad_corner_y += 1
+            self.pad_corner_y += amount
+            self.pad_corner_y = min(self.pad_corner_y, self.gridsize[0] + self.pad_pos_y - self.pad_extent_y)
 
-    def scroll_down(self):
+    def scroll_down(self, amount = 1):
         if self.pad_corner_y > 0:
-            self.pad_corner_y -= 1
+            self.pad_corner_y -= amount
+            self.pad_corner_y = max(self.pad_corner_y, 0)
 
-    def scroll_left(self):
+    def scroll_left(self, amount = 1):
         if self.pad_corner_x + self.width < self.gridsize[1]:
-            self.pad_corner_x += 1
+            self.pad_corner_x += amount
+            self.pad_corner_x = min(self.pad_corner_x, self.gridsize[1])
 
-    def scroll_right(self):
+    def scroll_right(self, amount = 1):
         if self.pad_corner_x > 0:
-            self.pad_corner_x -= 1
+            self.pad_corner_x -= amount
+            self.pad_corner_x = max(self.pad_corner_x, 0)
 
     def refresh_pad(self):
         self.pad.refresh(self.pad_corner_y, self.pad_corner_x,
@@ -1100,22 +1104,22 @@ class TermDAG(object):
 
                 # Scroll 
                 elif ch == ord('s') or ch == curses.KEY_DOWN or ch == 40:
-                    self.scroll_up()
+                    self.scroll_up(5)
                     stdscr.refresh()
                     self.refresh_pad()
 
                 elif ch == ord('w') or ch == curses.KEY_UP or ch == 38:
-                    self.scroll_down()
+                    self.scroll_down(5)
                     stdscr.refresh()
                     self.refresh_pad()
 
                 elif ch == ord('a') or ch == curses.KEY_LEFT or ch == 37:
-                    self.scroll_right()
+                    self.scroll_right(5)
                     stdscr.refresh()
                     self.refresh_pad()
 
                 elif ch == ord('d') or ch == curses.KEY_RIGHT or ch == 39:
-                    self.scroll_left()
+                    self.scroll_left(5)
                     stdscr.refresh()
                     self.refresh_pad()
 

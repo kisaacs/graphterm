@@ -2572,5 +2572,6 @@ def interactive_helper(stdscr, graph):
     graph.maxcolor = curses.COLORS
     for i in range(0, curses.COLORS):
         curses.init_pair(i + 1, i, -1)
+        curses.init_pair(i + 1 + curses.COLORS, 7, i)
     graph.print_interactive(stdscr, can_color)
     graph.write_tulip_positions()

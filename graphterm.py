@@ -806,7 +806,8 @@ class TermDAG(object):
             currenty = y1 - 1
             # Starting from currentx, move until just enough 
             # room to go the y direction (minus 1... we don't go all the way)
-            for x in range(x1 + xdir, x2 - xdir * (ydist), xdir):
+            for x in range(x1, x2 - xdir * (ydist), xdir):
+            #for x in range(x1 + xdir, x2 - xdir * (ydist), xdir):
                 if self.debug:
                     print 'moving horizontal with', x, (y1 - 1)
                 moves.append((x, y1 - 1, '_', True))

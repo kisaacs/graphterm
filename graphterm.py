@@ -2333,6 +2333,7 @@ class TermLayout(object):
         self.computeEdgeBends()
         print "Bends computed..."
 
+        self.printNodeCoords()
         # We disallow self loops, so nothing to do here
 
         # Adjust edge/node overlap -- skip for now
@@ -2366,9 +2367,9 @@ class TermLayout(object):
         # We have no reversed edges, because we only allow true DAGs
         for link in self._original_links:
             link.segments.append(self._nodes[link.source].coord)
-            link.segments.append(self._nodes[link.sink].coord)
             for nextLink in link.children:
                 link.segments.append(self._nodes[nextLink.sink].coord)
+            link.segments.append(self._nodes[link.sink].coord)
 
     def reduceCrossings(self, source, embedding):
         visited = dict()

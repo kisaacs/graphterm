@@ -2359,6 +2359,11 @@ class TermLayout(object):
                 node._in_links = sorted(node._in_links, key = lambda x : embedding[self._link_dict[x].source])
                 half = int(math.floor(len(node._in_links) / 2))
                 node._in_links = [ node._in_links[half] ]
+        for name, node in self._nodes.items():
+            for link in node._out_links:
+                if link not in self._nodes[self._link_dict[link].sink]._in_links:
+                    node._out_links.remove(link)
+                node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
 
 
     def computeEdgeBends(self):

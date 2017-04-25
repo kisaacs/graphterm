@@ -2126,7 +2126,7 @@ class TermLayout(object):
 
 
     def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
-        print 'rankSizes[rank] is', rankSizes[rank]
+        print 'rankSizes[rank] is', rankSizes[rank], 'for rank', rank
         node.coord = (x + relativePosition[node], -1 * (y + rankSizes[rank]/2.0))
         for linkid in node._out_links:
             link = self._link_dict[linkid]
@@ -2484,11 +2484,12 @@ class TermLayout(object):
             endRank = end.rank
 
             end._in_links.remove(link.id)
+            nameBase = start.name + '-' + end.name
 
             atRank = startRank + 1
             lastLink = link
             while atRank < endRank:
-                newName = start.name + '-' + str(atRank)
+                newName = nameBase + '-' + str(atRank)
                 newNode = TermNode(newName, None, False)
                 newNode.rank = atRank
                 self._nodes[newName] = newNode
@@ -2510,7 +2511,7 @@ class TermLayout(object):
     def printNodeCoords(self):
         print "Current node coordinates:"
         for name, node in self._nodes.items():
-            print name, self.get_node_coord(name) 
+            print name, self.get_node_coord(name)
 
     def create_single_source(self):
         sources = list()

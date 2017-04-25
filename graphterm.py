@@ -34,8 +34,8 @@ class TermDAG(object):
 
         self.layout = False
         self.debug = False
-        self.do_interactive = False
-        self.output_tulip = False
+        self.is_interactive = False
+        self.output_tulip = True
         self.name = 'default'
 
         self.left_offset = 0
@@ -165,7 +165,7 @@ class TermDAG(object):
 
     def interactive(self):
         self.layout_hierarchical()
-        if self.do_interactive:
+        if self.is_interactive:
             curses.wrapper(interactive_helper, self)
 
         # Persist the depiction with stdout:

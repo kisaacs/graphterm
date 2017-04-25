@@ -2334,6 +2334,7 @@ class TermLayout(object):
         print "Bends computed..."
 
         self.printNodeCoords()
+        self.printEdgeCoords()
         # We disallow self loops, so nothing to do here
 
         # Adjust edge/node overlap -- skip for now
@@ -2518,6 +2519,11 @@ class TermLayout(object):
         print "Current node coordinates:"
         for name, node in self._nodes.items():
             print name, self.get_node_coord(name)
+
+    def printEdgeCoords(self):
+        print "Current edge coordinates:"
+        for link in self._original_links:
+            print link.source, link.sink, link.segments
 
     def create_single_source(self):
         sources = list()

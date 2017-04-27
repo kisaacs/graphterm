@@ -206,6 +206,7 @@ class TermDAG(object):
         self.max_tulip_x = -1e9
         for node in self._nodes.values():
             coord = viewLayout.getNodeValue(node.tulipNode)
+            print "Node", node.name, coord
             node._x = coord[0]
             node._y = coord[1]
             xset.add(coord[0])
@@ -221,6 +222,7 @@ class TermDAG(object):
         segmentID = 0
         for link in self._links:
             link._coords = viewLayout.getEdgeValue(link.tulipLink)
+            print "Link", link.source, link.sink, link._coords
             last = (self._nodes[link.source]._x, self._nodes[link.source]._y)
             for coord in link._coords:
                 xset.add(coord[0])
@@ -2338,15 +2340,21 @@ class TermLayout(object):
         # We disallow self loops, so nothing to do here
 
         # Adjust edge/node overlap -- skip for now
-        # maxLayerSize = [1 for x in range(maxRank)]
-        # offset = 0.5 + self.spacing/4.0
-        # for link in self._original_links:
-        #    source = self._nodes[link.source]
-        #    sink = self._nodes[link.sink]
-        #    if not link.segments:
-        #        source.coord[1] += offset
-        #        sink.coord[1] -= offset
-        #    else:
+        maxLayerSize = [1 for x in range(maxRank)]  # All nodes have size 1
+        offset = 0.5 + self.spacing/4.0 # Therefore all offsetes are the same
+        # Note also that we know the source level is also less than the target
+        # level, therefore, we need to flip the offsets.
+        for link in self._original_links:
+            source = self._nodes[link.source]
+            sink = self._nodes[link.sink]
+            if not link.segments:
+                pass
+                #source.coord[1] -= offset
+                #sink.coord[1] += offset
+            else:
+                pass
+        # NOTE TO SELF: We don't have the right number of segments so I don't
+        # think this is something happening here. It must happen earlier.
 
 
         # Post-process to align nodes -- also skip for now
@@ -2367,15 +2375,25 @@ class TermLayout(object):
                 node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
 
 
+    def afterCoord(self, coord):
+        return (coord[0], coord[1] - self.spacing / 4.0)
+
+    def beforeCoord(self, coord):
+        return (coord[0], coord[1] + self.spacing / 4.0)
+
     def computeEdgeBends(self):
         # We have no replaced edges, since we modified them. -- at least their
         # ID is the same
         # We have no reversed edges, because we only allow true DAGs
+        # Note we do the spacing after & before coord for Tulip-like layout
         for link in self._original_links:
-            link.segments.append(self._nodes[link.source].coord)
-            link.segments.append(self._nodes[link.sink].coord)
+            link.segments.append(self.afterCoord(self._nodes[link.source].coord))
+            processingCoord = self._nodes[link.sink].coord
+            link.segments.append(self.beforeCoord(processingCoord))
             for nextLink in link.children:
-                link.segments.append(self._nodes[nextLink.sink].coord)
+                link.segments.append(self.afterCoord(processingCoord))
+                processingCoord = self._nodes[nextLink.sink].coord
+                link.segments.append(self.beforeCoord(processingCoord))
 
     def reduceCrossings(self, source, embedding):
         visited = dict()
@@ -2479,7 +2497,65 @@ class TermLayout(object):
 
         return maxRank
 
+
     def makeProper(self, source):
+        # Add dummy nodes
+        # This does more than actually makeProper, to match Auber/Tulip, it
+        # adds one dummy node for any length>1 link and two for any length>2
+        # It adds them right after the source and right before the sink.
+        toAppend = list()
+        for link in self._links:
+            link.children = []
+            start = self._nodes[link.source]
+            end = self._nodes[link.sink]
+            startRank = start.rank
+            endRank = end.rank
+
+            nameBase = start.name + '-' + end.name
+
+            delta = endRank - startRank
+            if delta > 1:
+                end._in_links.remove(link.id)
+                atRank = startRank + 1
+                newName = nameBase + '-' + str(atRank)
+                newNode = TermNode(newName, None, False)
+                newNode.rank = atRank
+                self._nodes[newName] = newNode
+
+                link.sink = newName
+                newNode.add_in_link(link.id)
+                newLinkName = str(link.id) + '-' + str(atRank)
+                newLink = TermLink(newLinkName, newName, end.name, None)
+                newNode.add_out_link(newLink.id)
+                link.children.append(newLink)
+                toAppend.append(newLink)
+                self._link_dict[newLinkName] = newLink
+
+                if delta > 2:
+                    atRank = endRank - 1
+                    secondName = nameBase + '-' + str(atRank)
+                    secondNode = TermNode(secondName, None, False)
+                    secondNode.rank = atRank
+                    self._nodes[secondName] = secondNode
+
+                    newLink.sink = secondName
+                    secondNode.add_in_link(newLink.id)
+                    secondLinkName = str(link.id) + '-' + str(atRank)
+                    secondLink = TermLink(nsecondLinkName, secondName, end.name, None)
+                    secondNode.add_out_link(secondLink.id)
+                    link.children.append(secondLink)
+                    toAppend.append(secondLink)
+                    self._link_dict[secondLinkName] = secondLink
+                    end.add_in_link(secondLink.id)
+                else:
+                    end.add_in_link(newLink.id)
+
+        # Add all the new links
+        for link in toAppend:
+            self._links.append(link)
+
+
+    def makeProperOldVersion(self, source):
         # Add dummy nodes
         # Note that this fixes an issue in Auber's makeProperDag which adds
         # at most two dummy nodes rather than one at every level.

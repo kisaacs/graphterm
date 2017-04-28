@@ -6,6 +6,8 @@ import math
 from tulip import *
 import math
 
+debug_layout = False
+
 class TermDAG(object):
 
     def __init__(self, logfile = None, question = None):
@@ -174,7 +176,8 @@ class TermDAG(object):
     def report(self):
         return self.layout_hierarchical()
 
-    def layout_hierarchical(self):
+
+    def layout_match(self):
         import time
         beginTL = time.time()
         self.TL = TermLayout(self)
@@ -215,7 +218,236 @@ class TermDAG(object):
                     continue
 
         print match, ' TL time', (endTL - beginTL), ' Tulip time', (endTulip - beginTulip)
+        return match
 
+
+    def layout_hierarchical(self):
+        self.TL = TermLayout(self)
+        self.TL.layout()
+
+        xset = set()
+        yset = set()
+        node_yset = set()
+        segments = set()
+        segment_lookup = dict()
+        self.segment_ids = dict()
+        coord_to_node = dict()
+        coord_to_placer = dict()
+
+        # Convert Tulip layout to something we can manipulate for both nodes
+        # and links.
+        maxy = -1e9
+        for node in self._nodes.values():
+            coord = self.TL._nodes[node.name].coord
+            if debug_layout:
+                print "Node", node.name, coord
+            node._x = coord[0]
+            node._y = coord[1]
+            xset.add(coord[0])
+            yset.add(coord[1])
+            node_yset.add(coord[1])
+            coord_to_node[(coord[0], coord[1])] = node
+            if coord[1] > maxy:
+                maxy = coord[1]
+                self.name = node.name
+
+        segmentID = 0
+        for link in self._links:
+            link._coords = self.TL._link_dict[link.id].segments
+            if debug_layout:
+                print "Link", link.source, link.sink, link._coords
+            last = (self._nodes[link.source]._x, self._nodes[link.source]._y)
+            for coord in link._coords:
+                xset.add(coord[0])
+                yset.add(coord[1])
+                if (last[0], last[1], coord[0], coord[1]) in segment_lookup:
+                    segment = segment_lookup[(last[0], last[1], coord[0], coord[1])]
+                else:
+                    segment = TermSegment(last[0], last[1], coord[0], coord[1], segmentID)
+                    self.segment_ids[segmentID] = segment
+                    segmentID += 1
+                    segments.add(segment)
+                    segment_lookup[(last[0], last[1], coord[0], coord[1])] = segment
+                link.segments.append(segment)
+                segment.links.append(link)
+                segment.start = coord_to_node[last]
+
+                if (coord[0], coord[1]) in coord_to_node:
+                    placer = coord_to_node[(coord[0], coord[1])]
+                    segment.end = placer
+                else:
+                    placer = TermNode("", None, False)
+                    coord_to_node[(coord[0], coord[1])] = placer
+                    coord_to_placer[(coord[0], coord[1])] = placer
+                    placer._x = coord[0]
+                    placer._y = coord[1]
+                    segment.end = placer
+
+                last = (coord[0], coord[1])
+
+            if (last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y) in segment_lookup:
+                segment = segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)]
+            else:
+                segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
+                    self._nodes[link.sink]._y, segmentID)
+                self.segment_ids[segmentID] = segment
+                segmentID += 1
+                segments.add(segment)
+                segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)] = segment
+            link.segments.append(segment)
+            segment.links.append(segment)
+            placer = coord_to_node[last]
+            segment.start = placer
+            segment.end = self._nodes[link.sink]
+
+        if self.debug:
+            self.write_tulip_positions();
+            print "xset", sorted(list(xset))
+            print "yset", sorted(list(yset))
+        if self.output_tulip:
+            tlp.saveGraph(self._tulip, self.name + '.tlp')
+
+        # Find crossings and create new segments based on them
+        self.find_crossings(segments)
+        if self.debug:
+            print "CROSSINGS ARE: "
+            #return
+
+        # Consolidate crossing points
+        crossings_points = dict()
+        for k, v in self.crossings.items():
+            if v not in crossings_points:
+                crossings_points[v] = set()
+            crossings_points[v].add(k[0])
+            crossings_points[v].add(k[1])
+
+        for v, k in crossings_points.items():
+            if self.debug:
+                print k, v
+            x, y = v
+            placer = TermNode('', None, False)
+            placer._x = x
+            placer._y = y
+            coord_to_node[(x,y)] = placer
+            coord_to_placer[(x,y)] = placer
+            for name in k:
+                segment = self.segment_ids[name]
+                new_segment = segment.split(placer)
+                segments.add(new_segment)
+            xset.add(x)
+            yset.add(y)
+
+        # Based on the tulip layout, do the following:
+        xsort = sorted(list(xset))
+        ysort = sorted(list(yset))
+        ysort.reverse()
+        segment_pos = dict()
+        column_multiplier = 2
+        row_multiplier = 2
+        self.gridsize = [len(ysort) - len(node_yset) + len(node_yset) * row_multiplier,
+            len(xsort) * column_multiplier]
+        y = 0
+        for ypos in ysort:
+            segment_pos[ypos] = y
+            if ypos in node_yset:
+                y += 1
+            y += 1
+
+        if self.debug:
+            print self.gridsize
+
+        row_lookup = dict()
+        col_lookup = dict()
+        row_nodes = dict()
+        for i, x in enumerate(xsort):
+            col_lookup[x] = i
+        for i, y in enumerate(ysort):
+            row_lookup[y] = i
+
+        # Figure out how nodes map to rows so we can figure out label
+        # placement allowances
+        self.row_last = [0 for x in range(self.gridsize[0])]
+        for coord, node in coord_to_node.items():
+            node._row = segment_pos[coord[1]]
+            node._col = column_multiplier * col_lookup[coord[0]]
+            if node.real:
+                if node._row not in row_nodes:
+                    row_nodes[node._row] = []
+                row_nodes[node._row].append(node)
+                if node._col > self.row_last[node._row]:
+                    self.row_last[node._row] = node._col
+
+        # Sort the labels by left-right position
+        for row, nodes in row_nodes.items():
+            row_nodes[row] = sorted(nodes, key = lambda node: node._col)
+
+        self.calculate_labels(row_nodes)
+
+        # Max number of columns needed -- we add one for a space
+        # between the graph and the labels.
+        self.gridsize[1] = self.row_max + 1
+
+        # Find the node order:
+        self.node_order = sorted(self._nodes.values(),
+            key = lambda node: node._row * 1e6 + node._col)
+        for i, node in enumerate(self.node_order):
+            node.order = i
+
+        # Create the grid
+        for i in range(self.gridsize[0]):
+            self.grid.append([' ' for j in range(self.gridsize[1])])
+            self.gridedge.append(0)
+
+        # Add the nodes in the grid
+        for coord, node in coord_to_node.items():
+            node._row = segment_pos[coord[1]]
+            node._col = column_multiplier * col_lookup[coord[0]]
+            if node.real:
+                self.grid[node._row][node._col] = 'o'
+
+                if self.debug:
+                    print 'Drawing node at', node._row, node._col
+                    self.print_grid()
+
+
+        # Sort segments on drawing difficulty -- this is useful for 
+        # debugging collisions. It will eventually be used to help
+        # re-route collisions.
+        segments = sorted(segments, key = lambda x: x.for_segment_sort())
+
+        # Add segments to the grid
+        status = 'passed'
+        for segment in segments:
+            segment.gridlist =  self.draw_line(segment)
+            self.row_last, err = self.set_to_grid(segment, self.row_last)
+            if not err:
+                status = 'drawing'
+
+        # Add labels to the grid
+        self.calculate_labels(row_nodes, check_grid = True)
+        self.names_to_grid()
+
+        if self.debug:
+            self.print_grid()
+            for segment in segments:
+                print segment, segment.gridlist
+
+        self.layout = True
+        return status
+
+
+    def layout_hierarchical_tulip(self):
+        viewLabel = self._tulip.getStringProperty('viewLabel')
+        for node in self._nodes.values():
+            viewLabel[node.tulipNode] = node.name
+
+        params = tlp.getDefaultPluginParameters('Hierarchical Graph', self._tulip)
+        params['orientation'] = 'vertical'
+        params['layer spacing'] = 5
+        params['node spacing'] = 5
+        viewLayout = self._tulip.getLayoutProperty('viewLayout')
+
+        self._tulip.applyLayoutAlgorithm('Hierarchical Graph', viewLayout, params)
 
         xset = set()
         yset = set()
@@ -233,7 +465,8 @@ class TermDAG(object):
         self.max_tulip_x = -1e9
         for node in self._nodes.values():
             coord = viewLayout.getNodeValue(node.tulipNode)
-            print "Node", node.name, coord
+            if debug_layout:
+                print "Node", node.name, coord
             node._x = coord[0]
             node._y = coord[1]
             xset.add(coord[0])
@@ -249,7 +482,8 @@ class TermDAG(object):
         segmentID = 0
         for link in self._links:
             link._coords = viewLayout.getEdgeValue(link.tulipLink)
-            print "Link", link.source, link.sink, link._coords
+            if debug_layout:
+                print "Link", link.source, link.sink, link._coords
             last = (self._nodes[link.source]._x, self._nodes[link.source]._y)
             for coord in link._coords:
                 xset.add(coord[0])
@@ -2132,16 +2366,19 @@ class TermLayout(object):
 
         # TreePlace -- figure out LR tree extents, put placements in
         # relativePosition
-        print "Placing tree..."
+        if debug_layout:
+            print "Placing tree..."
         self.treePlace(source, relativePosition)
 
         # Calc Layout -- convert relativePosition into coords
-        print "Tree placed, calculating coords...."
+        if debug_layout:
+            print "Tree placed, calculating coords...."
         self.calcLayout(source, relativePosition, 0, 0, 0, rankSizes)
 
         # Ortho is true -- do edge bends -- not sure this makes sense in our
         # case 
-        print "Layout calc'd. Doing edge bends inside RTE..."
+        if debug_layout:
+            print "Layout calc'd. Doing edge bends inside RTE..."
         for link in self._links:
             source = self._nodes[link.source]
             sink = self._nodes[link.sink]
@@ -2155,9 +2392,11 @@ class TermLayout(object):
 
 
     def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
-        print 'rankSizes[rank] is', rankSizes[rank], 'for rank', rank
+        if debug_layout:
+            print 'rankSizes[rank] is', rankSizes[rank], 'for rank', rank
         node.coord = (x + relativePosition[node], -1 * (y + rankSizes[rank]/2.0))
-        print node.name, 'with position', x, relativePosition[node], node.coord
+        if debug_layout:
+            print node.name, 'with position', x, relativePosition[node], node.coord
         for linkid in node._out_links:
             link = self._link_dict[linkid]
             out = self._nodes[link.sink]
@@ -2168,47 +2407,58 @@ class TermLayout(object):
 
     def treePlace(self, node, relativePosition):
         if len(node._out_links) == 0:
-            print 'Placing', node.name, 'with zero outlinks, rel position 0'
+            if debug_layout:
+                print 'Placing', node.name, 'with zero outlinks, rel position 0'
             relativePosition[node] = 0
             return [(-0.5, 0.5, 1)] # Triple L, R, size
 
-        print 'Determining left tree of', node.name
+        if debug_layout:
+            print 'Determining left tree of', node.name
         childPos = []
         leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition)
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
-        print 'Looping through out links of', node.name, node._out_links
+        if debug_layout:
+            print 'Looping through out links of', node.name, node._out_links
         for linkid in node._out_links[1:]:
             link = self._link_dict[linkid]
-            print 'Placing right tree based on', linkid
+            if debug_layout:
+                print 'Placing right tree based on', linkid
             rightTree = self.treePlace(self._nodes[link.sink], relativePosition)
             decal = self.calcDecal(leftTree, rightTree)
-            print 'Calculating decal of', node.name, decal
+            if debug_layout:
+                print 'Calculating decal of', node.name, decal
             tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
 
-            print 'Checking mergeLR for node', node.name, 'link', linkid
+            if debug_layout:
+                print 'Checking mergeLR for node', node.name, 'link', linkid
             foo = self.mergeLR(leftTree, rightTree, decal)
-            print '   ', foo, leftTree
+            if debug_layout:
+                print '   ', foo, leftTree
             if foo == leftTree:
             #if self.mergeLR(leftTree, rightTree, decal) == leftTree:
-                print '   appending equal'
+                if debug_layout:
+                    print '   appending equal'
                 childPos.append(tempLeft + decal)
                 rightTree = []
             else:
-                print '   subtracting decal equal'
+                if debug_layout:
+                    print '   subtracting decal equal'
                 for i, pos in enumerate(chlidPos):
                     childPos[i] = pos - decal
                 childPos.append(tempLeft)
                 leftTree = rightTree
 
 
-        print 'Looping through out links of', node.name, 'a second time'
+        if debug_layout:
+            print 'Looping through out links of', node.name, 'a second time'
         posFather = (leftTree[0][0] + leftTree[0][1]) / 2.0
         leftTree.insert(0, (posFather - 0.5, posFather + 0.5, 1))
         for i, linkid in enumerate(node._out_links):
             link = self._link_dict[linkid]
             relativePosition[self._nodes[link.sink]] = childPos[i] - posFather
-            print '   setting', self._nodes[link.sink].name, childPos[i], posFather, (childPos[i] - posFather)
+            if debug_layout:
+                print '   setting', self._nodes[link.sink].name, childPos[i], posFather, (childPos[i] - posFather)
         relativePosition[node] = 0
         return leftTree
 
@@ -2224,9 +2474,11 @@ class TermLayout(object):
         itL = 0
         itR = 0
 
-        print 'Beginning mergeLR loop of left', left, 'and right', right
+        if debug_layout:
+            print 'Beginning mergeLR loop of left', left, 'and right', right
         while itL != len(left) and itR != len(right):
-            print 'Beginning itL', itL, 'itR', itR, 'left', left, 'right', right
+            if debug_layout:
+                print 'Beginning itL', itL, 'itR', itR, 'left', left, 'right', right
             minSize = min(left[itL][size] - iL, right[itR][size] - iR)
             tmp = (left[itL][L], right[itR][R] + decal, minSize)
 
@@ -2268,7 +2520,8 @@ class TermLayout(object):
                 itR += 1
                 iR = 0
 
-            print '   Ending itL', itL, 'itR', itR, 'left', left, 'right', right
+            if debug_layout:
+                print '   Ending itL', itL, 'itR', itR, 'left', left, 'right', right
 
         if itL != len(left) and iL != 0:
             tmp = (left[itL][L], left[itL][R], left[itL][size] - iL)
@@ -2346,31 +2599,40 @@ class TermLayout(object):
 
 
         # Reorder in rank
-        print "Checking single source tree..."
+        if debug_layout:
+            print "Checking single source tree..."
         if not self.single_source_tree:
-            print "Reducing crossings..."
+            if debug_layout:
+                print "Reducing crossings..."
             self.reduceCrossings(source_node, embedding)
             # TODO: Set Edge Order ? 
 
-            print "Crossings reduced, creating spanning tree..."
+            if debug_layout:
+                print "Crossings reduced, creating spanning tree..."
             self.createSpanningTree(embedding)
 
-        print "Preparing to apply tree algorithm..."
+        if debug_layout:
+            print "Preparing to apply tree algorithm..."
         # Apply Tree algorithm
         rankSizes = []
         for row in self.grid:
             rankSizes.append(len(row))
-        print "RTE time... "
+        if debug_layout:
+            print "RTE time... "
         self.RTE(source_node, rankSizes) #self.grid)
-        print "RTE clear."
+        if debug_layout:
+            print "RTE clear."
 
         # Do Edge Bends
-        print "Computing edge bends..."
+        if debug_layout:
+            print "Computing edge bends..."
         self.computeEdgeBends()
-        print "Bends computed..."
+        if debug_layout:
+            print "Bends computed..."
 
-        self.printNodeCoords()
-        self.printEdgeCoords()
+        if debug_layout:
+            self.printNodeCoords()
+            self.printEdgeCoords()
         # We disallow self loops, so nothing to do here
 
         # Adjust edge/node overlap -- skip for now

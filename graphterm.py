@@ -2130,17 +2130,18 @@ class TermLayout(object):
     def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
         print 'rankSizes[rank] is', rankSizes[rank], 'for rank', rank
         node.coord = (x + relativePosition[node], -1 * (y + rankSizes[rank]/2.0))
+        print node.name, 'with position', x, relativePosition[node], node.coord
         for linkid in node._out_links:
             link = self._link_dict[linkid]
             out = self._nodes[link.sink]
             self.calcLayout(out, relativePosition,
-                x + relativePosition[out], y + self.spacing,
+                x + relativePosition[node], y + self.spacing,
                 rank + 1, rankSizes)
 
 
     def treePlace(self, node, relativePosition):
         if len(node._out_links) == 0:
-            print 'Placing', node.name, 'with zero outlinks'
+            print 'Placing', node.name, 'with zero outlinks, rel position 0'
             relativePosition[node] = 0
             return [(-0.5, 0.5, 1)] # Triple L, R, size
 
@@ -2149,20 +2150,25 @@ class TermLayout(object):
         leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition)
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
-        print 'Looping through out links of', node.name
+        print 'Looping through out links of', node.name, node._out_links
         for linkid in node._out_links[1:]:
             link = self._link_dict[linkid]
             print 'Placing right tree based on', linkid
             rightTree = self.treePlace(self._nodes[link.sink], relativePosition)
-            print 'Calculating decal of', node.name
             decal = self.calcDecal(leftTree, rightTree)
+            print 'Calculating decal of', node.name, decal
             tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
 
             print 'Checking mergeLR for node', node.name, 'link', linkid
-            if self.mergeLR(leftTree, rightTree, decal) == leftTree:
+            foo = self.mergeLR(leftTree, rightTree, decal)
+            print '   ', foo, leftTree
+            if foo == leftTree:
+            #if self.mergeLR(leftTree, rightTree, decal) == leftTree:
+                print '   appending equal'
                 childPos.append(tempLeft + decal)
                 rightTree = []
             else:
+                print '   subtracting decal equal'
                 for i, pos in enumerate(chlidPos):
                     childPos[i] = pos - decal
                 childPos.append(tempLeft)
@@ -2175,6 +2181,7 @@ class TermLayout(object):
         for i, linkid in enumerate(node._out_links):
             link = self._link_dict[linkid]
             relativePosition[self._nodes[link.sink]] = childPos[i] - posFather
+            print '   setting', self._nodes[link.sink].name, childPos[i], posFather, (childPos[i] - posFather)
         relativePosition[node] = 0
         return leftTree
 

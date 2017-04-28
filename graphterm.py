@@ -175,9 +175,13 @@ class TermDAG(object):
         return self.layout_hierarchical()
 
     def layout_hierarchical(self):
+        import time
+        beginTL = time.time()
         self.TL = TermLayout(self)
         self.TL.layout()
+        endTL = time.time()
 
+        beginTulip = time.time()
         viewLabel = self._tulip.getStringProperty('viewLabel')
         for node in self._nodes.values():
             viewLabel[node.tulipNode] = node.name
@@ -189,6 +193,29 @@ class TermDAG(object):
         viewLayout = self._tulip.getLayoutProperty('viewLayout')
 
         self._tulip.applyLayoutAlgorithm('Hierarchical Graph', viewLayout, params)
+        endTulip = time.time()
+
+        match = True
+        for node in self._nodes.values():
+            coord = viewLayout.getNodeValue(node.tulipNode)
+            if coord[0] != self.TL._nodes[node.name].coord[0]:
+                print '          ERROR', node.name, coord[0], self.TL._nodes[node.name].coord[0]
+                match = False
+            else:
+                print node.name, coord[0], self.TL._nodes[node.name].coord[0]
+
+        for link in self._links:
+            coords = viewLayout.getEdgeValue(link.tulipLink)
+            linkTL = self.TL._link_dict[link.id]
+            print link.id, self._nodes[link.source].name, self._nodes[link.sink].name, coords, linkTL.segments
+            for i, coord in enumerate(coords):
+                if coord[0] != linkTL.segments[i][0]:
+                    print '          ERROR', link.id, coords, linkTL.segments
+                    match = False
+                    continue
+
+        print match, ' TL time', (endTL - beginTL), ' Tulip time', (endTulip - beginTulip)
+
 
         xset = set()
         yset = set()

@@ -205,23 +205,28 @@ class TermDAG(object):
         for node in self._nodes.values():
             coord = viewLayout.getNodeValue(node.tulipNode)
             if coord[0] != self.TL._nodes[node.name].coord[0]:
-                print '          ERROR', node.name, coord[0], self.TL._nodes[node.name].coord[0]
+                if debug_layout:
+                    print '          ERROR', node.name, coord[0], self.TL._nodes[node.name].coord[0]
                 match = False
             else:
-                print node.name, coord[0], self.TL._nodes[node.name].coord[0]
+                if debug_layout:
+                    print node.name, coord[0], self.TL._nodes[node.name].coord[0]
 
         for link in self._links:
             coords = viewLayout.getEdgeValue(link.tulipLink)
             linkTL = self.TL._link_dict[link.id]
-            print link.id, self._nodes[link.source].name, self._nodes[link.sink].name, coords, linkTL.segments
+            if debug_layout:
+                print link.id, self._nodes[link.source].name, self._nodes[link.sink].name, coords, linkTL.segments
             for i, coord in enumerate(coords):
                 if coord[0] != linkTL.segments[i][0]:
-                    print '          ERROR', link.id, coords, linkTL.segments
+                    if debug_layout:
+                        print '          ERROR', link.id, coords, linkTL.segments
                     match = False
                     continue
 
-        print match, ' TL time', (endTL - beginTL), ' Tulip time', (endTulip - beginTulip)
-        return match
+        if debug_layout:
+            print match, ' TL time', (endTL - beginTL), ' Tulip time', (endTulip - beginTulip)
+        return match, (endTL - beginTL), (endTulip - beginTulip)
 
 
     def layout_hierarchical(self):

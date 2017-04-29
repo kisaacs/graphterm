@@ -165,8 +165,11 @@ class TermDAG(object):
         for i in range(self.gridsize[0]):
             print self.print_color_row(i, 0, self.gridsize[1] + 1)
 
-    def interactive(self):
-        self.layout_hierarchical()
+    def interactive(self, tulip = False):
+        if tulip:
+            self.layout_hierarchical_tulip()
+        else:
+            self.layout_hierarchical()
         if self.is_interactive:
             curses.wrapper(interactive_helper, self)
 
@@ -545,6 +548,12 @@ class TermDAG(object):
 
 
     def layout_hierarchical_tulip(self):
+        self.gridsize = [0,0]
+        self.gridedge = [] # the last char per row
+        self.grid = []
+        self.grid_colors = []
+        self.row_max = 0
+        self.row_names = dict()
         viewLabel = self._tulip.getStringProperty('viewLabel')
         for node in self._nodes.values():
             viewLabel[node.tulipNode] = node.name
@@ -813,6 +822,7 @@ class TermDAG(object):
             node.order = i
 
         # Create the grid
+        self.grid = []
         for i in range(self.gridsize[0]):
             self.grid.append([' ' for j in range(self.gridsize[1])])
             self.gridedge.append(0)

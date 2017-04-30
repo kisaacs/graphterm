@@ -34,10 +34,11 @@ class TermDAG(object):
         self.DOWN_LEFT = 2
         self.LEFT = 3
 
+        self.TL = None
         self.layout = False
         self.debug = False
-        self.is_interactive = False
-        self.output_tulip = True
+        self.is_interactive = True
+        self.output_tulip = False
         self.name = 'default'
 
         self.left_offset = 0
@@ -102,21 +103,25 @@ class TermDAG(object):
         self.hpad_extent_y = 3
         self.hpad_corner_x = 0
         self.hpad_corner_y = 0
-        self.hpad_collapsed = True
+        self.hpad_collapsed = False
 
         self.hpad_cmds = []
         self.hpad_msgs = []
         self.hpad_cmds.extend(self.hpad_default_cmds)
         self.hpad_cmds.append('/foo')
         self.hpad_cmds.append('ctrl-v')
-        self.hpad_cmds.append('ctrl-w')
-        self.hpad_cmds.append('ctrl-b')
+        self.hpad_cmds.append('')
+        self.hpad_cmds.append('n')
+        self.hpad_cmds.append('p')
         self.hpad_cmds.append('w,a,s,d')
+        self.hpad_cmds.append('arrow keys')
         self.hpad_msgs.extend(self.hpad_default_msgs)
-        self.hpad_msgs.append('highlight node foo')
-        self.hpad_msgs.append('change highlight mode')
-        self.hpad_msgs.append('advance node')
-        self.hpad_msgs.append('back a node')
+        self.hpad_msgs.append('highlight node "foo"')
+        self.hpad_msgs.append('change highlight mode:')
+        self.hpad_msgs.append('  neighbors or reachability')
+        self.hpad_msgs.append('advance highlighted node')
+        self.hpad_msgs.append('move back highlighted node')
+        self.hpad_msgs.append('scroll up, left, down, right')
         self.hpad_msgs.append('scroll directions')
 
         self.hpad_max_y = len(self.hpad_cmds)
@@ -673,7 +678,6 @@ class TermDAG(object):
 
         # Consolidate crossing points
         crossings_points = dict() # (x, y) -> set of segments
-        #crossed_segments = set()
         for k, v in self.crossings.items(): # crossings is (seg1, seg2) -> (x, y)
             if v not in crossings_points:
                 crossings_points[v] = set()
@@ -681,17 +685,9 @@ class TermDAG(object):
             crossings_points[v].add(k[1])
             self.segment_ids[k[0]].addCrossing(self.segment_ids[k[1]], v)
             self.segment_ids[k[1]].addCrossing(self.segment_ids[k[0]], v)
-            #crossed_segments.insert(k[0])
-            #crossed_segments.insert(k[1])
 
         for placer in self.placers:
-            placer.findInExtents(self.min_tulip_x, self.max_tulip_x, self.debug)
-
-
-        #for name in crossed_segments:
-        #    if self.segment_ids[name].extent:
-        #        self.segment_ids[name].defineCrossingHeights()
-
+            placer.findCrossingHeights(self.min_tulip_x, self.max_tulip_x, self.debug)
 
         # For each crossing, figure out if the end point of either already has
         # a set of height for that y value. Cases:
@@ -751,23 +747,6 @@ class TermDAG(object):
                 segments.add(new_segment)
             xset.add(x)
             yset.add(placer_y)
-
-
-        #for v, k in crossings_points.items():
-        #    if self.debug:
-        #        print k, v
-        #    x, y = v
-        #    placer = TermNode('', None, False)
-        #    placer._x = x
-        #    placer._y = y
-        #    coord_to_node[(x,y)] = placer
-        #    coord_to_placer[(x,y)] = placer
-        #    for name in k:
-        #        segment = self.segment_ids[name]
-        #        new_segment = segment.split(placer)
-        #        segments.add(new_segment)
-        #    xset.add(x)
-        #    yset.add(y)
 
         # Based on the tulip layout, do the following:
         xsort = sorted(list(xset))
@@ -1296,7 +1275,6 @@ class TermDAG(object):
             else:
                 self.qpad_pos_y = 0
 
-
     def center_xy(self, stdscr, x, y):
         ideal_corner_x = self.pad_corner_x
         ideal_corner_y = self.pad_corner_y
@@ -1398,7 +1376,10 @@ class TermDAG(object):
         msg_padding = msg_length - len(msg)
         string += ' ' * cmd_padding
         string += cmd
-        string += ' - '
+        if len(cmd) == 0:
+            string += '   '
+        else:
+            string += ' - '
         string += msg
         string += ' ' * msg_padding
         string += ' '
@@ -1429,7 +1410,6 @@ class TermDAG(object):
 
         self.resize(stdscr)
 
-
         if self.debug:
             stdscr.move(0, 0)
             self.color_dict = dict()
@@ -1444,11 +1424,11 @@ class TermDAG(object):
         # Save state
         self.grid_colors = []
         for row in range(self.gridsize[0]):
-            self.grid_colors.append([0 for x in range(self.gridsize[1])])
+            self.grid_colors.append([self.default_color for x in range(self.gridsize[1])])
 
         # Draw initial grid and initialize colors to default
         self.redraw_default(stdscr, self.offset)
-        self.collapse_help()
+        self.expand_help()
         stdscr.refresh()
         self.refresh_pad()
         stdscr.move(self.height - 1, 0)
@@ -1604,18 +1584,19 @@ class TermDAG(object):
                     stdscr.addstr(ch)
                     stdscr.refresh()
 
-    def select_node(self, stdscr, name, offset, doPad = True):
+
+
+    def select_node(self, stdscr, name, offset):
         # Clear existing highlights
-        if doPad:
+        if stdscr:
             self.redraw_default(stdscr, offset)
 
         if name in self._nodes:
-            self.highlight_node(stdscr, name, offset, self.select_color + self.maxcolor, doPad) # Cyan
-            self.highlight_neighbors(stdscr, name, offset, doPad)
+            self.highlight_node(stdscr, name, offset, self.select_color + self.maxcolor) # Cyan
+            self.highlight_neighbors(stdscr, name, offset)
 
-            if doPad:
-                node = self._nodes[name]
-                self.center_xy(stdscr, self.left_offset + node._col, node._row)
+            node = self._nodes[name]
+            self.center_xy(stdscr, self.left_offset + node._col, node._row)
             return name
 
         return ''
@@ -1634,8 +1615,8 @@ class TermDAG(object):
 
         for link in node._in_links:
             neighbor = self._nodes[link.source]
-            self.highlight_node(stdscr, neighbor.name, offset, self.neighbor_color, doPad)
-            self.highlight_segments(stdscr, link.segments, offset, doPad)
+            self.highlight_node(stdscr, neighbor.name, offset, self.neighbor_color)
+            self.highlight_segments(stdscr, link.segments, offset)
 
             if recurse:
                 self.highlight_in_neighbors(stdscr, link.source, offset, recurse, doPad)
@@ -1646,8 +1627,8 @@ class TermDAG(object):
 
         for link in node._out_links:
             neighbor = self._nodes[link.sink]
-            self.highlight_node(stdscr, neighbor.name, offset, self.neighbor_color, doPad)
-            self.highlight_segments(stdscr, link.segments, offset, doPad)
+            self.highlight_node(stdscr, neighbor.name, offset, self.neighbor_color)
+            self.highlight_segments(stdscr, link.segments, offset)
 
             if recurse:
                 self.highlight_out_neighbors(stdscr, link.sink, offset, recurse, doPad)
@@ -1663,9 +1644,9 @@ class TermDAG(object):
                 x += self.left_offset
                 if not draw or char == '':
                     continue
-                self.grid_colors[y][x] = 5
+                self.grid_colors[y][x] = self.neighbor_color
                 if self.grid[y][x] == ' ' or self.grid[y][x] == char:
-                    self.pad.addch(y, x, char, curses.color_pair(5))
+                    self.pad.addch(y, x, char, curses.color_pair(self.neighbor_color))
                 elif char != self.grid[y][x]:
                     if char == '_' and (self.grid[y][x] == '|'
                         or self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
@@ -1673,15 +1654,15 @@ class TermDAG(object):
                     elif (char == '|' or char == '/' or char == '\\') \
                         and self.grid[y][x] == '_':
                         self.grid[y][x] = char
-                        self.pad.addch(y, x,char, curses.color_pair(5))
+                        self.pad.addch(y, x,char, curses.color_pair(self.neighbor_color))
                     elif char == '|' and (self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
                         segment.gridlist[i] = (x, y, char, False)
                     elif (char == '/' or char == '\\') \
                         and self.grid[y][x] == '|':
                         self.grid[y][x] = char
-                        self.pad.addch(y, x,char, curses.color_pair(5))
+                        self.pad.addch(y, x,char, curses.color_pair(self.neighbor_color))
                     else:
-                        self.pad.addch(y, x, 'X', curses.color_pair(5))
+                        self.pad.addch(y, x, 'X', curses.color_pair(self.neighbor_color))
 
     def highlight_segments_printonly(self, segments, offset):
         for segment in segments:
@@ -1744,9 +1725,9 @@ class TermDAG(object):
     def redraw_default(self, stdscr, offset):
         for h in range(self.gridsize[0]):
             for w in range(self.gridsize[1]):
-                self.grid_colors[h][w] = 0
+                self.grid_colors[h][w] = self.default_color
                 if self.grid[h][w] != '':
-                    self.pad.addch(h, w, self.grid[h][w])
+                    self.pad.addch(h, w, self.grid[h][w], curses.color_pair(self.default_color))
                 else:
                     continue
 
@@ -2143,8 +2124,6 @@ class TermSegment(object):
         self.children = []
         self.origin = self
         self.original_end = None
-        self.extent = True # will be considered for crossing
-        self.split_groups = dict() # (y, dest-segment-name) -> SplitGroup
         self.vertical_crossing_count = 0
         self.crossing_count = 0
 
@@ -2153,26 +2132,8 @@ class TermSegment(object):
 
     def addCrossing(self, other, point):
         self.crossing_count += 1
-        #starty = other.y1
-        #destination = (other.x2, other.y2)
-        #if (starty, destination) in self.split_groups:
-        #    group = self.split_groups[(starty, destination)]
-        #else:
-        #    group = SplitGroup(starty, destination)
-        #    self.split_groups[(starty, destination)] = gruop
-        #group.segments.insert((other, point))
         if other.vertical:
             self.vertical_crossing_count += 1
-
-
-    def defineCrossingHeights(self):
-        for k, group in self.split_groups.items():
-            starty, destination = k
-            miny = group.segments[0][1][1]
-            for segment in group.segments:
-                miny = min(miny, segment[1][1]) # point[1] -- y coordinate)
-            group.height = miny
-
 
     def for_segment_sort(self):
         xlen = abs(self.x1 - self.x2)
@@ -2360,11 +2321,7 @@ class TermNode(object):
 
         self.real = real # Real node or segment connector?
         self._in_segments = list()
-        self.in_left = dict()
-        self.in_right = dict()
-        self.crossings = dict() # y -> list of (segment, point)
         self.crossing_counts = dict() # y -> # of crossings from in segments
-        self.vertical_in = None
         self.crossing_heights = dict() # y -> where the crossing should occur
 
     def add_in_link(self, link):
@@ -2378,39 +2335,16 @@ class TermNode(object):
             self.vertical_in = segment
         self._in_segments.append(segment)
 
-    def add_crossing(self, segment, point):
-        y = segment.y1
-        if y not in self.crossings:
-            self.crossings[y] = list()
-        self.crossings[y].append((segment, point))
-
-    def findInExtents(self, min_x, max_x, debug = False):
+    def findCrossingHeights(self, min_x, max_x, debug = False):
         if debug:
             print 'Find extents', self.name, self._x, self._y
         for segment in self._in_segments:
             y = segment.y1
-            x = segment.x1
             if y not in self.crossing_counts:
                 self.crossing_counts[y] = 0
             self.crossing_counts[y] += segment.vertical_crossing_count
             if debug:
                 print '   Segment:', segment.name, segment.x1, segment.y1, segment.vertical_crossing_count
-            if x < self._x: # left
-                if y not in self.in_left:
-                    self.in_left[y] = segment
-                elif self.in_left[y].x1 > x:
-                    self.in_left[y].extent = False
-                    self.in_left[y] = segment
-                else:
-                    segment.extent = False
-            elif x > self._x: # right
-                if y not in self.in_right:
-                    self.in_right[y] = segment
-                elif self.in_right[y].x1 < x:
-                    self.in_right[y].extent = False
-                    self.in_right[y] = segment
-                else:
-                    segment.extent = False
 
         # We set different offsets for different x values based on the
         # min and max x -- we never go higher than half way up the y value

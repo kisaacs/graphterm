@@ -250,6 +250,8 @@ class TermDAG(object):
         # Convert Tulip layout to something we can manipulate for both nodes
         # and links.
         maxy = -1e9
+        self.min_tulip_x = 1e9
+        self.max_tulip_x = -1e9
         for node in self._nodes.values():
             coord = self.TL._nodes[node.name].coord
             if debug_layout:
@@ -263,6 +265,8 @@ class TermDAG(object):
             if coord[1] > maxy:
                 maxy = coord[1]
                 self.name = node.name
+            self.max_tulip_x = max(self.max_tulip_x, coord[0])
+            self.min_tulip_x = min(self.min_tulip_x, coord[0])
 
         segmentID = 0
         for link in self._links:
@@ -281,6 +285,7 @@ class TermDAG(object):
                     segmentID += 1
                     segments.add(segment)
                     segment_lookup[(last[0], last[1], coord[0], coord[1])] = segment
+                    segment.paths.add((link.source, link.sink))
                 link.segments.append(segment)
                 segment.links.append(link)
                 segment.start = coord_to_node[last]
@@ -288,13 +293,18 @@ class TermDAG(object):
                 if (coord[0], coord[1]) in coord_to_node:
                     placer = coord_to_node[(coord[0], coord[1])]
                     segment.end = placer
+                    segment.original_end = placer
+                    placer.add_in_segment(segment)
                 else:
                     placer = TermNode("", None, False)
+                    self.placers.add(placer)
                     coord_to_node[(coord[0], coord[1])] = placer
                     coord_to_placer[(coord[0], coord[1])] = placer
                     placer._x = coord[0]
                     placer._y = coord[1]
                     segment.end = placer
+                    segment.original_end = placer
+                    placer.add_in_segment(segment)
 
                 last = (coord[0], coord[1])
 
@@ -304,6 +314,7 @@ class TermDAG(object):
                 segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
                     self._nodes[link.sink]._y, segmentID)
                 self.segment_ids[segmentID] = segment
+                segment.paths.add((link.source, link.sink))
                 segmentID += 1
                 segments.add(segment)
                 segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)] = segment
@@ -312,6 +323,7 @@ class TermDAG(object):
             placer = coord_to_node[last]
             segment.start = placer
             segment.end = self._nodes[link.sink]
+            segment.original_end = self._nodes[link.sink]
 
         if self.debug:
             self.write_tulip_positions();
@@ -328,7 +340,6 @@ class TermDAG(object):
 
         # Consolidate crossing points
         crossings_points = dict() # (x, y) -> set of segments
-        #crossed_segments = set()
         for k, v in self.crossings.items(): # crossings is (seg1, seg2) -> (x, y)
             if v not in crossings_points:
                 crossings_points[v] = set()
@@ -336,17 +347,9 @@ class TermDAG(object):
             crossings_points[v].add(k[1])
             self.segment_ids[k[0]].addCrossing(self.segment_ids[k[1]], v)
             self.segment_ids[k[1]].addCrossing(self.segment_ids[k[0]], v)
-            #crossed_segments.insert(k[0])
-            #crossed_segments.insert(k[1])
 
         for placer in self.placers:
-            placer.findInExtents(self.min_tulip_x, self.max_tulip_x, self.debug)
-
-
-        #for name in crossed_segments:
-        #    if self.segment_ids[name].extent:
-        #        self.segment_ids[name].defineCrossingHeights()
-
+            placer.findCrossingHeights(self.min_tulip_x, self.max_tulip_x, self.debug)
 
         # For each crossing, figure out if the end point of either already has
         # a set of height for that y value. Cases:
@@ -407,23 +410,6 @@ class TermDAG(object):
             xset.add(x)
             yset.add(placer_y)
 
-
-        #for v, k in crossings_points.items():
-        #    if self.debug:
-        #        print k, v
-        #    x, y = v
-        #    placer = TermNode('', None, False)
-        #    placer._x = x
-        #    placer._y = y
-        #    coord_to_node[(x,y)] = placer
-        #    coord_to_placer[(x,y)] = placer
-        #    for name in k:
-        #        segment = self.segment_ids[name]
-        #        new_segment = segment.split(placer)
-        #        segments.add(new_segment)
-        #    xset.add(x)
-        #    yset.add(y)
-
         # Based on the tulip layout, do the following:
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
@@ -482,6 +468,7 @@ class TermDAG(object):
             node.order = i
 
         # Create the grid
+        self.grid = []
         for i in range(self.gridsize[0]):
             self.grid.append([' ' for j in range(self.gridsize[1])])
             self.gridedge.append(0)

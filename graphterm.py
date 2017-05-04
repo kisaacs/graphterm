@@ -6,7 +6,7 @@ import math
 from tulip import *
 import math
 
-debug_layout = False
+debug_layout = True
 
 class TermDAG(object):
 
@@ -71,6 +71,31 @@ class TermDAG(object):
         if self.question:
             self.initialize_question()
 
+    def reset(self):
+        self._positions_set = False
+        self.gridsize = [0,0]
+        self.gridedge = [] # the last char per row
+        self.grid = []
+        self.grid_colors = []
+        self.row_max = 0
+        self.row_names = dict()
+        self.placers = set()
+
+        toDelete = list()
+        for node in self._nodes.values():
+            if not node.real:
+                toDelete.append(node)
+            else:
+                node.reset()
+
+        for node in toDelete:
+            del self._nodes[node.name]
+            del node
+
+        for link in self._links:
+            link.reset()
+
+
     def log_character(self, ch):
         if isinstance(ch, unicode):
             self.logfile.write(str(ch).decode('utf-8').encode('utf-8'))
@@ -88,6 +113,7 @@ class TermDAG(object):
         self.qpad_corner_y = 0
         self.qpad_max_x = self.qpad_extent_x + 1
         self.qpad_max_y = 2
+
 
     def initialize_help(self):
         self.hpad = None # Help Pad
@@ -192,6 +218,8 @@ class TermDAG(object):
         self.TL.layout()
         endTL = time.time()
 
+
+        self.reset()
         beginTulip = time.time()
         viewLabel = self._tulip.getStringProperty('viewLabel')
         for node in self._nodes.values():
@@ -362,7 +390,7 @@ class TermDAG(object):
                 print k, v
             special_heights = list()
             if self.debug:
-                print "Testing point', v"
+                print "Testing point", v
             for name in k:
                 segment = self.segment_ids[name]
                 #print 'Testing point', v, 'for segment', segment, 'with height', segment.end.crossing_heights
@@ -2311,6 +2339,19 @@ class TermNode(object):
         self.crossing_counts = dict() # y -> # of crossings from in segments
         self.crossing_heights = dict() # y -> where the crossing should occur
 
+    def reset(self):
+        self.rank = -1 # Int
+        self._x = -1  # Real
+        self._y = -1  # Real
+        self._col = 0 # Int
+        self._row = 0 # Int
+        self.label_pos = -1 # Int
+        self.use_offset = True
+
+        self._in_segments = list()
+        self.crossing_counts = dict() # y -> # of crossings from in segments
+        self.crossing_heights = dict() # y -> where the crossing should occur
+
     def add_in_link(self, link):
         self._in_links.append(link)
 
@@ -2359,6 +2400,11 @@ class TermLink(object):
         self.source = source_id
         self.sink = sink_id
         self.tulipLink = tlp
+        self._coords = None
+
+        self.segments = []
+
+    def reset(self):
         self._coords = None
 
         self.segments = []
@@ -2729,11 +2775,10 @@ class TermLayout(object):
         for link in self._original_links:
             link.segments.append(self.afterCoord(self._nodes[link.source].coord))
             processingCoord = self._nodes[link.sink].coord
-            link.segments.append(self.beforeCoord(processingCoord))
             for nextLink in link.children:
-                link.segments.append(self.afterCoord(processingCoord))
+                link.segments.append(processingCoord)
                 processingCoord = self._nodes[nextLink.sink].coord
-                link.segments.append(self.beforeCoord(processingCoord))
+            link.segments.append(self.beforeCoord(processingCoord))
 
     def reduceCrossings(self, source, embedding):
         visited = dict()
@@ -2881,7 +2926,7 @@ class TermLayout(object):
                     newLink.sink = secondName
                     secondNode.add_in_link(newLink.id)
                     secondLinkName = str(link.id) + '-' + str(atRank)
-                    secondLink = TermLink(nsecondLinkName, secondName, end.name, None)
+                    secondLink = TermLink(secondLinkName, secondName, end.name, None)
                     secondNode.add_out_link(secondLink.id)
                     link.children.append(secondLink)
                     toAppend.append(secondLink)

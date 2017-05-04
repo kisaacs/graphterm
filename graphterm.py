@@ -2774,11 +2774,28 @@ class TermLayout(object):
         # Note we do the spacing after & before coord for Tulip-like layout
         for link in self._original_links:
             link.segments.append(self.afterCoord(self._nodes[link.source].coord))
+            if link.children:
+                firstCoord = self._nodes[link.sink].coord
+                secondCoord = self._nodes[link.children[-1].source].coord
+                if firstCoord != secondCoord:
+                    link.segments.append(self.beforeCoord(firstCoord))
+                    link.segments.append(self.afterCoord(secondCoord))
+                else:
+                    link.segments.append(self.beforeCoord(firstCoord))
+                    link.segments.append(self.afterCoord(firstCoord))
+                link.segments.append(self.beforeCoord(self._nodes[link.children[-1].sink].coord))
+            else:
+                link.segments.append(self.beforeCoord(self._nodes[link.sink].coord))
+        return
+
+        for link in self._original_links:
+            link.segments.append(self.afterCoord(self._nodes[link.source].coord))
             processingCoord = self._nodes[link.sink].coord
-            for nextLink in link.children:
-                link.segments.append(processingCoord)
-                processingCoord = self._nodes[nextLink.sink].coord
             link.segments.append(self.beforeCoord(processingCoord))
+            for nextLink in link.children:
+                link.segments.append(self.afterCoord(processingCoord))
+                processingCoord = self._nodes[nextLink.sink].coord
+                link.segments.append(self.beforeCoord(processingCoord))
 
     def reduceCrossings(self, source, embedding):
         visited = dict()

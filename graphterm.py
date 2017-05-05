@@ -2486,7 +2486,9 @@ class TermLayout(object):
     def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
         if debug_layout:
             print 'rankSizes[rank] is', rankSizes[rank], 'for rank', rank
-        node.coord = (x + relativePosition[node], -1 * (y + rankSizes[rank]/2.0))
+        # All nodes are the same size, so we don't have to do spacing
+        # weirdness
+        node.coord = (x + relativePosition[node], -1 * self.spacing * rank) # + rankSizes[rank]/2.0))
         if debug_layout:
             print node.name, 'with position', x, relativePosition[node], node.coord
         for linkid in node._out_links:
@@ -2680,6 +2682,8 @@ class TermLayout(object):
 
         # Ensure each link spans exactly one rank
         if not self.single_source_tree:
+            if debug_layout:
+                print "Make proper..."
             self.makeProper(source_node)
 
         embedding = dict()
@@ -2934,6 +2938,8 @@ class TermLayout(object):
                 link.children.append(newLink)
                 toAppend.append(newLink)
                 self._link_dict[newLinkName] = newLink
+                if debug_layout:
+                    print "   Adding node at rank", atRank, "to", start.name, "-->", end.name
 
                 if delta > 2:
                     atRank = endRank - 1
@@ -2951,6 +2957,8 @@ class TermLayout(object):
                     toAppend.append(secondLink)
                     self._link_dict[secondLinkName] = secondLink
                     end.add_in_link(secondLink.id)
+                    if debug_layout:
+                        print "   Adding node at rank", atRank, "to", start.name, "-->", end.name
                 else:
                     end.add_in_link(newLink.id)
 

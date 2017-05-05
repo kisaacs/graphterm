@@ -347,7 +347,7 @@ class TermDAG(object):
                 segments.add(segment)
                 segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)] = segment
             link.segments.append(segment)
-            segment.links.append(segment)
+            segment.links.append(link)
             placer = coord_to_node[last]
             segment.start = placer
             segment.end = self._nodes[link.sink]
@@ -672,7 +672,7 @@ class TermDAG(object):
                 segments.add(segment)
                 segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)] = segment
             link.segments.append(segment)
-            segment.links.append(segment)
+            segment.links.append(link)
             placer = coord_to_node[last]
             segment.start = placer
             segment.end = self._nodes[link.sink]
@@ -2211,6 +2211,8 @@ class TermSegment(object):
         splitter.x2 = node._x
         splitter.y2 = node._y
         for link in self.origin.links:
+            # Why had this never been triggered before since it should have
+            # failed
             link.segments.append(other)
 
         other.origin = self.origin

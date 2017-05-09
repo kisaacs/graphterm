@@ -16,6 +16,7 @@ class TermDAG(object):
             self.logfile = open(logfile, 'a')
         self.question = question
         self._nodes = dict()
+        self._nodes_list = list()
         self._links = list()
         self._positions_set = False
         self._tulip = tlp.newGraph()
@@ -172,6 +173,7 @@ class TermDAG(object):
         tulipNode = self._tulip.addNode()
         node = TermNode(name, tulipNode)
         self._nodes[name] = node
+        self._nodes_list.append(name)
         self.layout = False
 
     def add_link(self, source, sink):
@@ -2423,9 +2425,12 @@ class TermLayout(object):
         self.single_source_tree = False
 
         self._nodes = dict()
+        self._nodes_list = list()
         self._links = list()
         self._link_dict = dict()
         self._original_links = list()
+        for name in graph._nodes_list:
+            self._nodes_list.append(name)
         for name, node in graph._nodes.items():
             self._nodes[name] = node.skeleton_copy()
 
@@ -2680,6 +2685,11 @@ class TermLayout(object):
         for i in range(maxRank + 1):
             self.grid.append([])
 
+        # Divide nodes by rank into grid
+        for name in self._nodes_list:
+            node = self._nodes[name]
+            self.grid[node.rank].append(node)
+
         # Ensure each link spans exactly one rank
         if not self.single_source_tree:
             if debug_layout:
@@ -2689,9 +2699,6 @@ class TermLayout(object):
         embedding = dict()
 
 
-        # Divide nodes by rank into grid
-        for node in self._nodes.values():
-            self.grid[node.rank].append(node)
 
 
         # Reorder in rank
@@ -2755,12 +2762,14 @@ class TermLayout(object):
 
     def createSpanningTree(self, embedding):
         # Only keeps the middle edge
-        for name, node in self._nodes.items():
+        for name in self._nodes_list:
+            node = self._nodes[name]
             if len(node._in_links) > 1:
                 node._in_links = sorted(node._in_links, key = lambda x : embedding[self._link_dict[x].source])
                 half = int(math.floor(len(node._in_links) / 2))
                 node._in_links = [ node._in_links[half] ]
-        for name, node in self._nodes.items():
+        for name in self._nodes_list:
+            node = self._nodes[name]
             for link in node._out_links:
                 if link not in self._nodes[self._link_dict[link].sink]._in_links:
                     node._out_links.remove(link)
@@ -2809,7 +2818,8 @@ class TermLayout(object):
         # Add temporary sink and set visited
         sink = TermNode('sink', None, False)
         tmpSinkLinks = list()
-        for node in self._nodes.values():
+        for name in self._nodes_list:
+            node = self._nodes[name]
             visited[node.name] = False
             if not node._out_links:
                 linkName = node.name + '-sink'
@@ -2823,6 +2833,7 @@ class TermLayout(object):
         # Add sink to self._nodes after so we don't create a sink link to
         # itself
         self._nodes['sink'] = sink # Caution!! This will not work if there is a node named sink, please fix
+        self._nodes_list.append('sink')
 
         # Setup grid
         self.grid.append([])
@@ -2838,22 +2849,37 @@ class TermLayout(object):
         #        embedding[node.name] = i
         for row in self.grid:
             for i, node in enumerate(row):
+                if debug_layout:
+                    print "Setting node", node.name, "embedding to", i
                 embedding[node.name] = i
 
         maxRank = len(self.grid) - 1
         for q in range(self.num_sweeps):
             # Up Sweep
-            for i in range(maxRank - 1, -1, -1):
+            for i in range(maxRank, -1, -1):
+                print "  Two layer on", i, "True"
                 self.reduceTwoLayerCrossings(embedding, i, True)
 
             # Down Sweep
-            for i in range(maxRank): # was 'maxDepth' -- not sure what I was thinking there
+            for i in range(maxRank + 1): # was 'maxDepth' -- not sure what I was thinking there
+                print "  Two layer on", i, "False"
                 self.reduceTwoLayerCrossings(embedding, i, False)
+
+
+        print "Past two layer crossings"
+        for a, row in enumerate(self.grid):
+            print "Working on row", a
+            sorted_row = sorted(row, key = lambda x : embedding[x.name])
+            for i, node in enumerate(sorted_row):
+                if debug_layout:
+                    print "Setting node", node.name, "embedding to", i
+                embedding[node.name] = i
 
         for link in tmpSinkLinks:
             self._nodes[link.source]._out_links.remove(link.id)
             self._links.remove(link)
         del self._nodes[sink.name]
+        self._nodes_list.remove('sink')
 
 
     def reduceTwoLayerCrossings(self, embedding, layer, isUp):
@@ -2868,6 +2894,8 @@ class TermLayout(object):
             for linkid in node._in_links:
                 mySum += embedding[self._link_dict[linkid].source]
             embedding[node.name] = mySum / float(degree + 1.0)
+            print "Setting node", node.name, "embedding to", (mySum / float(degree + 1.0)), \
+                "from sum", mySum, "and deg", degree
 
 
     def setInitialCrossing(self, node, visited, embedding, i):
@@ -2925,40 +2953,44 @@ class TermLayout(object):
             if delta > 1:
                 end._in_links.remove(link.id)
                 atRank = startRank + 1
-                newName = nameBase + '-' + str(atRank)
+                newName = nameBase + '-1' #+ str(atRank)
                 newNode = TermNode(newName, None, False)
                 newNode.rank = atRank
                 self._nodes[newName] = newNode
+                self._nodes_list.append(newName)
 
                 link.sink = newName
                 newNode.add_in_link(link.id)
-                newLinkName = str(link.id) + '-' + str(atRank)
+                newLinkName = str(link.id) + '-1' #+ str(atRank)
                 newLink = TermLink(newLinkName, newName, end.name, None)
                 newNode.add_out_link(newLink.id)
                 link.children.append(newLink)
                 toAppend.append(newLink)
                 self._link_dict[newLinkName] = newLink
+                self.grid[atRank].append(newNode)
                 if debug_layout:
                     print "   Adding node at rank", atRank, "to", start.name, "-->", end.name
 
                 if delta > 2:
                     atRank = endRank - 1
-                    secondName = nameBase + '-' + str(atRank)
+                    secondName = nameBase + '-2' #+ str(atRank)
                     secondNode = TermNode(secondName, None, False)
                     secondNode.rank = atRank
                     self._nodes[secondName] = secondNode
+                    self._nodes_list.append(secondName)
 
                     newLink.sink = secondName
                     secondNode.add_in_link(newLink.id)
-                    secondLinkName = str(link.id) + '-' + str(atRank)
+                    secondLinkName = str(link.id) + '-2'# + str(atRank)
                     secondLink = TermLink(secondLinkName, secondName, end.name, None)
                     secondNode.add_out_link(secondLink.id)
                     link.children.append(secondLink)
                     toAppend.append(secondLink)
                     self._link_dict[secondLinkName] = secondLink
                     end.add_in_link(secondLink.id)
+                    self.grid[startRank + 2].append(secondNode)
                     if debug_layout:
-                        print "   Adding node at rank", atRank, "to", start.name, "-->", end.name
+                        print "   Adding node at rank", (startRank + 2), "to", start.name, "-->", end.name
                 else:
                     end.add_in_link(newLink.id)
 
@@ -3020,19 +3052,20 @@ class TermLayout(object):
                 sources.append(node)
 
 
-        if len(sources) == 1:
-            return sources[0]
-        else:
-            source = TermNode('source', None, False)
-            self._nodes['source'] = source
-            for i, node in enumerate(sources):
-                linkName = 'source-' + str(i)
-                link = TermLink(linkName, 'source', node.name, None)
-                source.add_out_link(linkName)
-                node.add_in_link(linkName)
-                self._links.append(link)
-                self._link_dict[linkName] = link
-            return source
+        #if len(sources) == 1:
+        #    return sources[0]
+        #else:
+        source = TermNode('source', None, False)
+        self._nodes['source'] = source
+        self._nodes_list.append('source')
+        for i, node in enumerate(sources):
+            linkName = 'source-' + str(i)
+            link = TermLink(linkName, 'source', node.name, None)
+            source.add_out_link(linkName)
+            node.add_in_link(linkName)
+            self._links.append(link)
+            self._link_dict[linkName] = link
+        return source
 
     def has_cycles(self):
         seen = set()

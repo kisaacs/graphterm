@@ -2799,7 +2799,7 @@ class TermLayout(object):
             for link in node._out_links:
                 if link not in self._nodes[self._link_dict[link].sink]._in_links:
                     node._out_links.remove(link)
-                node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
+                #node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
 
 
     def afterCoord(self, coord):

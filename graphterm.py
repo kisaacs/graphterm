@@ -2405,6 +2405,7 @@ class TermLink(object):
         self.sink = sink_id
         self.tulipLink = tlp
         self._coords = None
+        self._edgeLength = 1
 
         self.segments = []
 
@@ -2489,8 +2490,6 @@ class TermLayout(object):
 
 
     def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
-        if debug_layout:
-            print 'rankSizes[rank] is', rankSizes[rank], 'for rank', rank
         # All nodes are the same size, so we don't have to do spacing
         # weirdness
         node.coord = (x + relativePosition[node], -1 * self.spacing * rank) # + rankSizes[rank]/2.0))
@@ -2515,15 +2514,30 @@ class TermLayout(object):
             print 'Determining left tree of', node.name
         childPos = []
         leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition)
+        print "  left tree is", leftTree
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
+
+        # useLength
+        if self._link_dict[node._out_links[0]]._edgeLength > 1:
+            leftTree.insert(0, (leftTree[0][0], leftTree[0][1],
+                self._link_dict[node._out_links[0]]._edgeLength - 1)) # length is probably always 1
+            if debug_layout:
+                print "   pushing for use length", node._out_links[0], "of length"
 
         if debug_layout:
             print 'Looping through out links of', node.name, node._out_links
         for linkid in node._out_links[1:]:
             link = self._link_dict[linkid]
+
+            if link._edgeLength > 1:
+                rightTree.insert(0, (rightTree[0][0], rightTree[0][1],
+                    link._edgeLength - 1))
+                print "  TMPLENGTH right tree is:", rightTree
+
             if debug_layout:
-                print 'Placing right tree based on', linkid
+                print 'Placing right tree based on', linkid, link.source, "-->", link.sink
             rightTree = self.treePlace(self._nodes[link.sink], relativePosition)
+            print "  right tree is", rightTree
             decal = self.calcDecal(leftTree, rightTree)
             if debug_layout:
                 print 'Calculating decal of', node.name, decal
@@ -2762,12 +2776,14 @@ class TermLayout(object):
 
     def createSpanningTree(self, embedding):
         # Only keeps the middle edge
+        print "SPANNING TREE"
         for name in self._nodes_list:
             node = self._nodes[name]
             if len(node._in_links) > 1:
                 node._in_links = sorted(node._in_links, key = lambda x : embedding[self._link_dict[x].source])
                 half = int(math.floor(len(node._in_links) / 2))
                 node._in_links = [ node._in_links[half] ]
+                print "   Keeping", node._in_links[0], self._link_dict[node._in_links[0]].source, "-->", node.name
         for name in self._nodes_list:
             node = self._nodes[name]
             for link in node._out_links:
@@ -2994,6 +3010,7 @@ class TermLayout(object):
                     self._nodes_list.append(secondName)
 
                     newLink.sink = secondName
+                    newLink._edgeLength = delta - 2
                     secondNode.add_in_link(newLink.id)
                     secondLinkName = str(link.id) + '-2'# + str(atRank)
                     secondLink = TermLink(secondLinkName, secondName, end.name, None)

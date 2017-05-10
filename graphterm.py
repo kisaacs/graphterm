@@ -2847,10 +2847,12 @@ class TermLayout(object):
         #    sortedRow = sorted(row, lambda x : embedding[x.name])
         #    for i, node in enumerate(sortedRow):
         #        embedding[node.name] = i
-        for row in self.grid:
+        degrees = self.createFakeDegrees()
+        for a, row in enumerate(self.grid):
+            print "On row", a
             for i, node in enumerate(row):
                 if debug_layout:
-                    print "Setting node", node.name, "embedding to", i
+                    print "Setting node", node.name, "embedding to", i, "with degree", degrees[node.name]
                 embedding[node.name] = i
 
         maxRank = len(self.grid) - 1
@@ -2858,12 +2860,12 @@ class TermLayout(object):
             # Up Sweep
             for i in range(maxRank, -1, -1):
                 print "  Two layer on", i, "True"
-                self.reduceTwoLayerCrossings(embedding, i, True)
+                self.reduceTwoLayerCrossings(embedding, i, True, degrees)
 
             # Down Sweep
             for i in range(maxRank + 1): # was 'maxDepth' -- not sure what I was thinking there
                 print "  Two layer on", i, "False"
-                self.reduceTwoLayerCrossings(embedding, i, False)
+                self.reduceTwoLayerCrossings(embedding, i, False, degrees)
 
 
         print "Past two layer crossings"
@@ -2882,13 +2884,14 @@ class TermLayout(object):
         self._nodes_list.remove('sink')
 
 
-    def reduceTwoLayerCrossings(self, embedding, layer, isUp):
+    def reduceTwoLayerCrossings(self, embedding, layer, isUp, degrees):
         # In Auber this appears to just compute based on both fixed layers at
         # the same time. I have left it the same.
         row = self.grid[layer]
         for node in row:
             mySum = embedding[node.name]
-            degree = len(node._out_links) + len(node._in_links)
+            #degree = len(node._out_links) + len(node._in_links)
+            degree = degrees[node.name]
             for linkid in node._out_links:
                 mySum += embedding[self._link_dict[linkid].sink]
             for linkid in node._in_links:
@@ -2897,6 +2900,17 @@ class TermLayout(object):
             print "Setting node", node.name, "embedding to", (mySum / float(degree + 1.0)), \
                 "from sum", mySum, "and deg", degree
 
+
+    def createFakeDegrees(self):
+        degrees = dict()
+        for name in self._nodes_list:
+            node = self._nodes[name]
+            degree = len(node._out_links) + len(node._in_links)
+            if name == 'sink':
+                degree += 2
+
+            degrees[name] = degree
+        return degrees
 
     def setInitialCrossing(self, node, visited, embedding, i):
         if visited[node.name]:

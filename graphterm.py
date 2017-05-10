@@ -2498,9 +2498,19 @@ class TermLayout(object):
         for linkid in node._out_links:
             link = self._link_dict[linkid]
             out = self._nodes[link.sink]
-            self.calcLayout(out, relativePosition,
-                x + relativePosition[node], y + self.spacing,
-                rank + 1, rankSizes)
+
+            # New
+            lenCounter = link._edgeLength
+            decalY = y + self.spacing * lenCounter
+            decalLevel = rank + lenCounter
+
+            self.calcLayout(out, relativePosition, x + relativePosition[node],
+                decalY, decalLevel, rankSizes)
+
+            # Old
+            #self.calcLayout(out, relativePosition,
+            #    x + relativePosition[node], y + self.spacing,
+            #    rank + 1, rankSizes)
 
 
     def treePlace(self, node, relativePosition):

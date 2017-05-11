@@ -81,6 +81,8 @@ class TermDAG(object):
         self.row_max = 0
         self.row_names = dict()
         self.placers = set()
+        self.left_offset = 0
+        self.right_offset = 0
 
         toDelete = list()
         for node in self._nodes.values():

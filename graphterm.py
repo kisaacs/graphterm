@@ -2546,7 +2546,7 @@ class TermLayout(object):
                 print indent, node.name, 'placing right tree based on', self._debug_names[linkid]
             rightTree = self.treePlace(self._nodes[link.sink], relativePosition, indent + "  ")
             if debug_layout:
-                print indent, node.name, "found right tree is", rightTree
+                print indent, node.name, "found right tree is", rightTree, " and left tree is ", leftTree
 
 
             if link._edgeLength > 1:
@@ -2562,7 +2562,7 @@ class TermLayout(object):
 
             if debug_layout:
                 print indent, node.name, 'Checking mergeLR for link', self._debug_names[linkid]
-            foo = self.mergeLR(leftTree, rightTree, decal, indent)
+            foo = self.mergeLR(leftTree, rightTree, decal, indent + "  ")
             if debug_layout:
                 print indent, node.name, "post-mergeLR", foo, leftTree
             if foo == leftTree:
@@ -2606,7 +2606,7 @@ class TermLayout(object):
 
         if debug_layout:
             print indent, 'Beginning mergeLR loop of left', left, 'and right', right
-        while itL != len(left) and itR != len(right):
+        while itL < len(left) and itR < len(right):
             if debug_layout:
                 print indent, 'Beginning itL', itL, 'itR', itR, 'left', left, 'right', right
             minSize = min(left[itL][size] - iL, right[itR][size] - iR)
@@ -2651,20 +2651,22 @@ class TermLayout(object):
                 iR = 0
 
             if debug_layout:
-                print indent, 'Ending itL', itL, 'itR', itR, 'left', left, 'right', right
+                print indent, 'Ending itL', itL, 'itR', itR, 'iL', iL, 'iR', iR, 'left', left, 'right', right
 
-        if itL != len(left) and iL != 0:
+        if itL < len(left) and iL != 0:
             tmp = (left[itL][L], left[itL][R], left[itL][size] - iL)
             itL += 1
 
-        if itR != len(right) and iR != 0:
-            tmp = (right[itR][L] + decal, right[itR][R] + decal, right[itR][size] - iR)
-            left.append(tmp)
-            itR += 1
+        if itR < len(right):
+            if iR != 0:
+                tmp = (right[itR][L] + decal, right[itR][R] + decal, right[itR][size] - iR)
+                left.append(tmp)
+                itR += 1
 
             while itR < len(right):
                 tmp = (right[itR][L] + decal, right[itR][R] + decal, right[itR][size])
                 left.append(tmp)
+                itR += 1
 
         return left
 

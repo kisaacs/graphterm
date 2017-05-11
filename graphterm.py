@@ -2631,20 +2631,24 @@ class TermLayout(object):
                         left[itL] = tmp
                     else:
                         left.insert(itL, tmp)
-                        left[itL][size] -= minSize
+                        left[itL] = (left[itL][L], left[itL][R], left[itL][size] - minSize)
+                        #left[itL][size] -= minSize
                         iL = -1 * minSize
                 else:
                     if iL + minSize >= left[itL][size]: # end
-                        left[itL][size] -= minSize
+                        left[itL] = (left[itL][L], left[itL][R], left[itL][size] - minSize)
+                        #left[itL][size] -= minSize
                         itL += 1
                         left.insert(itL, tmp)
                         iL = -1 * minSize
                     else: # middle
                         tmp2 = left[itL]
-                        left[itL][size] = iL
+                        #left[itL][size] = iL
+                        left[itL] = (left[itL][L], left[itL][R], iL)
                         itL += 1
                         left.insert(itL, tmp)
-                        tmp2[size] -= iL + minSize
+                        #tmp2[size] -= iL + minSize
+                        tmp2 = (tmp2[L], tmp2[R], tmp2[size] - (iL + minSize))
                         left.insert(itL, tmp2)
                         itL -= 1
                         iL = -1 * minSize

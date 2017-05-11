@@ -2429,6 +2429,7 @@ class TermLayout(object):
         self._nodes_list = list()
         self._links = list()
         self._link_dict = dict()
+        self._debug_names = dict()
         self._original_links = list()
         for name in graph._nodes_list:
             self._nodes_list.append(name)
@@ -2440,6 +2441,7 @@ class TermLayout(object):
             self._links.append(skeleton)
             self._original_links.append(skeleton)
             self._link_dict[link.id] = skeleton
+            self._debug_names[link.id] = link.source + "-->" + link.sink
 
 
         self.grid = []
@@ -2465,7 +2467,7 @@ class TermLayout(object):
         # TreePlace -- figure out LR tree extents, put placements in
         # relativePosition
         if debug_layout:
-            print "Placing tree..."
+            print "PLACING TREE..."
         self.treePlace(source, relativePosition)
 
         # Calc Layout -- convert relativePosition into coords
@@ -2489,12 +2491,12 @@ class TermLayout(object):
                 link.coords = tmp
 
 
-    def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
+    def calcLayout(self, node, relativePosition, x, y, rank, rankSizes, indent = "  "):
         # All nodes are the same size, so we don't have to do spacing
         # weirdness
         node.coord = (x + relativePosition[node], -1 * self.spacing * rank) # + rankSizes[rank]/2.0))
         if debug_layout:
-            print node.name, 'with position', x, relativePosition[node], node.coord
+            print indent, node.name, 'with position', x, relativePosition[node], node.coord
         for linkid in node._out_links:
             link = self._link_dict[linkid]
             out = self._nodes[link.sink]
@@ -2505,7 +2507,7 @@ class TermLayout(object):
             decalLevel = rank + lenCounter
 
             self.calcLayout(out, relativePosition, x + relativePosition[node],
-                decalY, decalLevel, rankSizes)
+                decalY, decalLevel, rankSizes, indent + "  ")
 
             # Old
             #self.calcLayout(out, relativePosition,
@@ -2513,18 +2515,19 @@ class TermLayout(object):
             #    rank + 1, rankSizes)
 
 
-    def treePlace(self, node, relativePosition):
+    def treePlace(self, node, relativePosition, indent = "  " ):
         if len(node._out_links) == 0:
             if debug_layout:
-                print 'Placing', node.name, 'with zero outlinks, rel position 0'
+                print indent, node.name, 'place with zero outlinks [(-0.5, 0.5, 1)]'
             relativePosition[node] = 0
             return [(-0.5, 0.5, 1)] # Triple L, R, size
 
         if debug_layout:
-            print 'Determining left tree of', node.name
+            print indent, node.name, 'placing left tree'
         childPos = []
-        leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition)
-        print "  left tree is", leftTree
+        leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition,
+            indent + "  " )
+        print indent, node.name, "left tree is", leftTree
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
         # useLength
@@ -2532,41 +2535,42 @@ class TermLayout(object):
             leftTree.insert(0, (leftTree[0][0], leftTree[0][1],
                 self._link_dict[node._out_links[0]]._edgeLength - 1)) # length is probably always 1
             if debug_layout:
-                print "   pushing for use length", node._out_links[0], "of length"
+                print indent, node.name, "pushing for use length", self._debug_names[node._out_links[0]]
 
         if debug_layout:
-            print 'Looping through out links of', node.name, node._out_links
+            print indent, node.name, 'looping through out links', [ self._debug_names[x] for x in node._out_links ]
         for linkid in node._out_links[1:]:
             link = self._link_dict[linkid]
 
             if link._edgeLength > 1:
                 rightTree.insert(0, (rightTree[0][0], rightTree[0][1],
                     link._edgeLength - 1))
-                print "  TMPLENGTH right tree is:", rightTree
+                print indent, node.name, "use length right tree is:", rightTree
 
             if debug_layout:
-                print 'Placing right tree based on', linkid, link.source, "-->", link.sink
-            rightTree = self.treePlace(self._nodes[link.sink], relativePosition)
-            print "  right tree is", rightTree
+                print indent, node.name, 'placing right tree based on', self._debug_names[linkid]
+            rightTree = self.treePlace(self._nodes[link.sink], relativePosition, indent + "  ")
+            if debug_layout:
+                print indent, node.name, "found right tree is", rightTree
             decal = self.calcDecal(leftTree, rightTree)
             if debug_layout:
-                print 'Calculating decal of', node.name, decal
+                print indent, node.name, 'Calculating decal of', decal
             tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
 
             if debug_layout:
-                print 'Checking mergeLR for node', node.name, 'link', linkid
-            foo = self.mergeLR(leftTree, rightTree, decal)
+                print indent, node.name, 'Checking mergeLR for link', self._debug_names[linkid]
+            foo = self.mergeLR(leftTree, rightTree, decal, indent)
             if debug_layout:
-                print '   ', foo, leftTree
+                print indent, node.name, "post-mergeLR", foo, leftTree
             if foo == leftTree:
             #if self.mergeLR(leftTree, rightTree, decal) == leftTree:
                 if debug_layout:
-                    print '   appending equal'
+                    print indent, node.name, 'appending equal'
                 childPos.append(tempLeft + decal)
                 rightTree = []
             else:
                 if debug_layout:
-                    print '   subtracting decal equal'
+                    print indent, node.name, 'subtracting decal equal'
                 for i, pos in enumerate(chlidPos):
                     childPos[i] = pos - decal
                 childPos.append(tempLeft)
@@ -2574,19 +2578,19 @@ class TermLayout(object):
 
 
         if debug_layout:
-            print 'Looping through out links of', node.name, 'a second time'
+            print indent, node.name, 'looping through out links a second time'
         posFather = (leftTree[0][0] + leftTree[0][1]) / 2.0
         leftTree.insert(0, (posFather - 0.5, posFather + 0.5, 1))
         for i, linkid in enumerate(node._out_links):
             link = self._link_dict[linkid]
             relativePosition[self._nodes[link.sink]] = childPos[i] - posFather
             if debug_layout:
-                print '   setting', self._nodes[link.sink].name, childPos[i], posFather, (childPos[i] - posFather)
+                print indent, node.name, 'setting', self._nodes[link.sink].name, childPos[i], posFather, (childPos[i] - posFather)
         relativePosition[node] = 0
         return leftTree
 
 
-    def mergeLR(self, left, right, decal):
+    def mergeLR(self, left, right, decal, indent = " "):
         # Left and Right lists are tuples (left, right, size)
         L = 0
         R = 1
@@ -2598,10 +2602,10 @@ class TermLayout(object):
         itR = 0
 
         if debug_layout:
-            print 'Beginning mergeLR loop of left', left, 'and right', right
+            print indent, 'Beginning mergeLR loop of left', left, 'and right', right
         while itL != len(left) and itR != len(right):
             if debug_layout:
-                print 'Beginning itL', itL, 'itR', itR, 'left', left, 'right', right
+                print indent, 'Beginning itL', itL, 'itR', itR, 'left', left, 'right', right
             minSize = min(left[itL][size] - iL, right[itR][size] - iR)
             tmp = (left[itL][L], right[itR][R] + decal, minSize)
 
@@ -2644,7 +2648,7 @@ class TermLayout(object):
                 iR = 0
 
             if debug_layout:
-                print '   Ending itL', itL, 'itR', itR, 'left', left, 'right', right
+                print indent, 'Ending itL', itL, 'itR', itR, 'left', left, 'right', right
 
         if itL != len(left) and iL != 0:
             tmp = (left[itL][L], left[itL][R], left[itL][size] - iL)
@@ -2855,6 +2859,7 @@ class TermLayout(object):
                 sink.add_in_link(linkName)
                 tmpSinkLinks.append(sinkLink)
                 self._link_dict[linkName] = sinkLink
+                self._debug_names[linkName] = linkName
 
         # Add sink to self._nodes after so we don't create a sink link to
         # itself
@@ -3003,6 +3008,7 @@ class TermLayout(object):
                 newNode.add_in_link(link.id)
                 newLinkName = str(link.id) + '-1' #+ str(atRank)
                 newLink = TermLink(newLinkName, newName, end.name, None)
+                self._debug_names[newLinkName] = self._debug_names[link.id] + '-1'
                 newNode.add_out_link(newLink.id)
                 link.children.append(newLink)
                 toAppend.append(newLink)
@@ -3024,6 +3030,7 @@ class TermLayout(object):
                     secondNode.add_in_link(newLink.id)
                     secondLinkName = str(link.id) + '-2'# + str(atRank)
                     secondLink = TermLink(secondLinkName, secondName, end.name, None)
+                    self._debug_names[secondLinkName] = self._debug_names[link.id] + '-2'
                     secondNode.add_out_link(secondLink.id)
                     link.children.append(secondLink)
                     toAppend.append(secondLink)
@@ -3106,6 +3113,7 @@ class TermLayout(object):
             node.add_in_link(linkName)
             self._links.append(link)
             self._link_dict[linkName] = link
+            self._debug_names[linkName] = linkName
         return source
 
     def has_cycles(self):

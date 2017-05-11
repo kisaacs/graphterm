@@ -2818,13 +2818,19 @@ class TermLayout(object):
                 half = int(math.floor(len(node._in_links) / 2))
                 node._in_links = [ node._in_links[half] ]
                 if debug_layout:
-                    print "   Keeping", node._in_links[0], self._link_dict[node._in_links[0]].source, "-->", node.name
+                    print "   Keeping", node._in_links[0], self._debug_names[node._in_links[0]]
+            elif debug_layout and len(node._in_links) == 1:
+                print "   Keeping", node._in_links[0], self._debug_names[node._in_links[0]]
         for name in self._nodes_list:
             node = self._nodes[name]
+            toRemove = list()
             for link in node._out_links:
                 if link not in self._nodes[self._link_dict[link].sink]._in_links:
-                    node._out_links.remove(link)
-                node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
+                    toRemove.append(link)
+                    #node._out_links.remove(link)
+            for link in toRemove:
+                node._out_links.remove(link)
+            node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
 
 
     def afterCoord(self, coord):

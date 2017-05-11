@@ -2542,16 +2542,19 @@ class TermLayout(object):
         for linkid in node._out_links[1:]:
             link = self._link_dict[linkid]
 
-            if link._edgeLength > 1:
-                rightTree.insert(0, (rightTree[0][0], rightTree[0][1],
-                    link._edgeLength - 1))
-                print indent, node.name, "use length right tree is:", rightTree
-
             if debug_layout:
                 print indent, node.name, 'placing right tree based on', self._debug_names[linkid]
             rightTree = self.treePlace(self._nodes[link.sink], relativePosition, indent + "  ")
             if debug_layout:
                 print indent, node.name, "found right tree is", rightTree
+
+
+            if link._edgeLength > 1:
+                rightTree.insert(0, (rightTree[0][0], rightTree[0][1],
+                    link._edgeLength - 1))
+                print indent, node.name, "use length right tree is:", rightTree
+
+
             decal = self.calcDecal(leftTree, rightTree)
             if debug_layout:
                 print indent, node.name, 'Calculating decal of', decal
@@ -2803,7 +2806,7 @@ class TermLayout(object):
             for link in node._out_links:
                 if link not in self._nodes[self._link_dict[link].sink]._in_links:
                     node._out_links.remove(link)
-                #node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
+                node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
 
 
     def afterCoord(self, coord):

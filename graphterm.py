@@ -6,7 +6,7 @@ import math
 from tulip import *
 import math
 
-debug_layout = True
+debug_layout = False
 
 class TermDAG(object):
 
@@ -2527,7 +2527,8 @@ class TermLayout(object):
         childPos = []
         leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition,
             indent + "  " )
-        print indent, node.name, "left tree is", leftTree
+        if debug_layout:
+            print indent, node.name, "left tree is", leftTree
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
         # useLength
@@ -2552,7 +2553,8 @@ class TermLayout(object):
             if link._edgeLength > 1:
                 rightTree.insert(0, (rightTree[0][0], rightTree[0][1],
                     link._edgeLength - 1))
-                print indent, node.name, "use length right tree is:", rightTree
+                if debug_layout:
+                    print indent, node.name, "use length right tree is:", rightTree
 
 
             decal = self.calcDecal(leftTree, rightTree)
@@ -2795,14 +2797,16 @@ class TermLayout(object):
 
     def createSpanningTree(self, embedding):
         # Only keeps the middle edge
-        print "SPANNING TREE"
+        if debug_layout:
+            print "SPANNING TREE"
         for name in self._nodes_list:
             node = self._nodes[name]
             if len(node._in_links) > 1:
                 node._in_links = sorted(node._in_links, key = lambda x : embedding[self._link_dict[x].source])
                 half = int(math.floor(len(node._in_links) / 2))
                 node._in_links = [ node._in_links[half] ]
-                print "   Keeping", node._in_links[0], self._link_dict[node._in_links[0]].source, "-->", node.name
+                if debug_layout:
+                    print "   Keeping", node._in_links[0], self._link_dict[node._in_links[0]].source, "-->", node.name
         for name in self._nodes_list:
             node = self._nodes[name]
             for link in node._out_links:
@@ -2885,7 +2889,8 @@ class TermLayout(object):
         #        embedding[node.name] = i
         degrees = self.createFakeDegrees()
         for a, row in enumerate(self.grid):
-            print "On row", a
+            if debug_layout:
+                print "On row", a
             for i, node in enumerate(row):
                 if debug_layout:
                     print "Setting node", node.name, "embedding to", i, "with degree", degrees[node.name]
@@ -2895,18 +2900,22 @@ class TermLayout(object):
         for q in range(self.num_sweeps):
             # Up Sweep
             for i in range(maxRank, -1, -1):
-                print "  Two layer on", i, "True"
+                if debug_layout:
+                    print "  Two layer on", i, "True"
                 self.reduceTwoLayerCrossings(embedding, i, True, degrees)
 
             # Down Sweep
             for i in range(maxRank + 1): # was 'maxDepth' -- not sure what I was thinking there
-                print "  Two layer on", i, "False"
+                if debug_layout:
+                    print "  Two layer on", i, "False"
                 self.reduceTwoLayerCrossings(embedding, i, False, degrees)
 
 
-        print "Past two layer crossings"
+        if debug_layout:
+            print "Past two layer crossings"
         for a, row in enumerate(self.grid):
-            print "Working on row", a
+            if debug_layout:
+                print "Working on row", a
             sorted_row = sorted(row, key = lambda x : embedding[x.name])
             for i, node in enumerate(sorted_row):
                 if debug_layout:
@@ -2933,8 +2942,9 @@ class TermLayout(object):
             for linkid in node._in_links:
                 mySum += embedding[self._link_dict[linkid].source]
             embedding[node.name] = mySum / float(degree + 1.0)
-            print "Setting node", node.name, "embedding to", (mySum / float(degree + 1.0)), \
-                "from sum", mySum, "and deg", degree
+            if debug_layout:
+                print "Setting node", node.name, "embedding to", (mySum / float(degree + 1.0)), \
+                    "from sum", mySum, "and deg", degree
 
 
     def createFakeDegrees(self):

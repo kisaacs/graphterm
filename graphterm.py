@@ -2429,12 +2429,16 @@ class TermLayout(object):
 
         self._nodes = dict()
         self._nodes_list = list()
+        self._added = dict()
+        self._running_neighbors = dict()
         self._links = list()
         self._link_dict = dict()
         self._debug_names = dict()
         self._original_links = list()
         for name in graph._nodes_list:
             self._nodes_list.append(name)
+            self._added[name] = 0
+            self._running_neighbors[name] = set()
         for name, node in graph._nodes.items():
             self._nodes[name] = node.skeleton_copy()
 
@@ -2444,6 +2448,8 @@ class TermLayout(object):
             self._original_links.append(skeleton)
             self._link_dict[link.id] = skeleton
             self._debug_names[link.id] = link.source + "-->" + link.sink
+            self._running_neighbors[link.source].add(link.sink)
+            self._running_neighbors[link.sink].add(link.source)
 
 
         self.grid = []
@@ -2858,6 +2864,9 @@ class TermLayout(object):
 
         # Add temporary sink and set visited
         sink = TermNode('sink', None, False)
+        self._added['sink'] = 0
+        self._running_neighbors['sink'] = set()
+        self._running_neighbors['sink'].add('sink')
         tmpSinkLinks = list()
         for name in self._nodes_list:
             node = self._nodes[name]
@@ -2871,6 +2880,8 @@ class TermLayout(object):
                 tmpSinkLinks.append(sinkLink)
                 self._link_dict[linkName] = sinkLink
                 self._debug_names[linkName] = linkName
+                self._running_neighbors['sink'].add(node.name)
+                self._running_neighbors[node.name].add('sink')
 
         # Add sink to self._nodes after so we don't create a sink link to
         # itself
@@ -2938,11 +2949,15 @@ class TermLayout(object):
         for node in row:
             mySum = embedding[node.name]
             #degree = len(node._out_links) + len(node._in_links)
-            degree = degrees[node.name]
-            for linkid in node._out_links:
-                mySum += embedding[self._link_dict[linkid].sink]
-            for linkid in node._in_links:
-                mySum += embedding[self._link_dict[linkid].source]
+            degree = degrees[node.name] + self._added[node.name]
+            for name in self._running_neighbors[node.name]:
+                mySum += embedding[name]
+            if node.name == 'sink': # Account for sink between twice its neighbor in tulip
+                mySum += embedding['sink']
+            #for linkid in node._out_links:
+            #    mySum += embedding[self._link_dict[linkid].sink]
+            #for linkid in node._in_links:
+            #    mySum += embedding[self._link_dict[linkid].source]
             embedding[node.name] = mySum / float(degree + 1.0)
             if debug_layout:
                 print "Setting node", node.name, "embedding to", (mySum / float(degree + 1.0)), \
@@ -3013,6 +3028,8 @@ class TermLayout(object):
 
             delta = endRank - startRank
             if delta > 1:
+                self._added[start.name] += 1
+                self._added[end.name] += 1
                 end._in_links.remove(link.id)
                 atRank = startRank + 1
                 newName = nameBase + '-1' #+ str(atRank)
@@ -3020,6 +3037,10 @@ class TermLayout(object):
                 newNode.rank = atRank
                 self._nodes[newName] = newNode
                 self._nodes_list.append(newName)
+                self._added[newName] = 0
+                self._running_neighbors[newName] = set()
+                self._running_neighbors[start.name].add(newName)
+                self._running_neighbors[newName].add(start.name)
 
                 link.sink = newName
                 newNode.add_in_link(link.id)
@@ -3041,6 +3062,12 @@ class TermLayout(object):
                     secondNode.rank = atRank
                     self._nodes[secondName] = secondNode
                     self._nodes_list.append(secondName)
+                    self._added[secondName] = 0
+                    self._running_neighbors[secondName] = set()
+                    self._running_neighbors[secondName].add(newName)
+                    self._running_neighbors[newName].add(secondName)
+                    self._running_neighbors[end.name].add(secondName)
+                    self._running_neighbors[secondName].add(end.name)
 
                     newLink.sink = secondName
                     newLink._edgeLength = delta - 2
@@ -3058,6 +3085,8 @@ class TermLayout(object):
                         print "   Adding node at rank", (startRank + 2), "to", start.name, "-->", end.name
                 else:
                     end.add_in_link(newLink.id)
+                    self._running_neighbors[end.name].add(newName)
+                    self._running_neighbors[newName].add(end.name)
 
         # Add all the new links
         for link in toAppend:
@@ -3123,6 +3152,8 @@ class TermLayout(object):
         source = TermNode('source', None, False)
         self._nodes['source'] = source
         self._nodes_list.append('source')
+        self._added['source'] = 0
+        self._running_neighbors['source'] = set()
         for i, node in enumerate(sources):
             linkName = 'source-' + str(i)
             link = TermLink(linkName, 'source', node.name, None)
@@ -3131,6 +3162,8 @@ class TermLayout(object):
             self._links.append(link)
             self._link_dict[linkName] = link
             self._debug_names[linkName] = linkName
+            self._running_neighbors['source'].add(node.name)
+            self._running_neighbors[node.name].add('source')
         return source
 
     def has_cycles(self):

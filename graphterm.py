@@ -6,7 +6,7 @@ import math
 from tulip import *
 import math
 
-debug_layout = True
+debug_layout = False
 
 class TermDAG(object):
 
@@ -2633,6 +2633,7 @@ class TermLayout(object):
                         left[itL] = tmp
                     else:
                         left.insert(itL, tmp)
+                        itL += 1  #Increment after insert
                         left[itL] = (left[itL][L], left[itL][R], left[itL][size] - minSize)
                         #left[itL][size] -= minSize
                         iL = -1 * minSize
@@ -2642,6 +2643,7 @@ class TermLayout(object):
                         #left[itL][size] -= minSize
                         itL += 1
                         left.insert(itL, tmp)
+                        itL += 1  #Increment after insert
                         iL = -1 * minSize
                     else: # middle
                         tmp2 = left[itL]
@@ -2649,9 +2651,11 @@ class TermLayout(object):
                         left[itL] = (left[itL][L], left[itL][R], iL)
                         itL += 1
                         left.insert(itL, tmp)
+                        itL += 1  #Increment after insert
                         #tmp2[size] -= iL + minSize
                         tmp2 = (tmp2[L], tmp2[R], tmp2[size] - (iL + minSize))
                         left.insert(itL, tmp2)
+                        itL += 1  #Increment after insert
                         itL -= 1
                         iL = -1 * minSize
 

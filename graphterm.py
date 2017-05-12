@@ -2,7 +2,6 @@ import heapq
 from heapq import *
 import curses
 import curses.ascii
-import math
 from tulip import *
 import math
 
@@ -11,10 +10,13 @@ debug_layout = False
 class TermDAG(object):
 
     def __init__(self, logfile = None, question = None):
+        # Display question, keep logs for studies
         self.logfile = logfile
         if logfile:
             self.logfile = open(logfile, 'a')
         self.question = question
+
+        # Graph and layout
         self._nodes = dict()
         self._nodes_list = list()
         self._links = list()
@@ -30,12 +32,7 @@ class TermDAG(object):
         self.TL = None
         self.placers = set()
 
-        self.RIGHT = 0
-        self.DOWN_RIGHT = 1
-        self.DOWN_LEFT = 2
-        self.LEFT = 3
-
-        self.TL = None
+        # Debug flags
         self.layout = False
         self.debug = False
         self.is_interactive = True
@@ -47,6 +44,7 @@ class TermDAG(object):
 
         self.highlight_full_connectivity = False
 
+        # Pad containing layout
         self.pad = None
         self.pad_pos_x = 0
         self.pad_pos_y = 0
@@ -60,13 +58,42 @@ class TermDAG(object):
 
         self.maxcolor = 7
         self.default_color = 0 # whatever is the true default
-        #self.select_color = 7 # cyan
-        #self.neighbor_color = 5 # blue
-        #self.default_color = 5 # whatever is the true default
         self.select_color = 2 # red
         self.neighbor_color = 2 # red
 
         self.initialize_help()
+
+        self.qpad = None
+        if self.question:
+            self.initialize_question()
+
+
+    def reset(self):
+        """Resets the layout data structures for multi-layout comparison."""
+        self._positions_set = False
+        self.gridsize = [0,0]
+        self.gridedge = [] # the last char per row
+        self.grid = []
+        self.grid_colors = []
+        self.row_max = 0
+        self.row_names = dict()
+        self.placers = set()
+        self.left_offset = 0
+        self.right_offset = 0
+
+        toDelete = list()
+        for node in self._nodes.values():
+            if not node.real:
+                toDelete.append(node)
+            else:
+                node.reset()
+
+        for node in toDelete:
+            del self._nodes[node.name]
+            del node
+
+        for link in self._links:
+            link.reset()
 
         self.qpad = None
         if self.question:
@@ -100,6 +127,7 @@ class TermDAG(object):
 
 
     def log_character(self, ch):
+        """Write a character to the interaction log."""
         if isinstance(ch, unicode):
             self.logfile.write(str(ch).decode('utf-8').encode('utf-8'))
         elif isinstance(ch, int) and ch < 128:
@@ -107,7 +135,9 @@ class TermDAG(object):
         elif isinstance(ch, int):
             self.logfile.write(str(ch).decode('utf-8').encode('utf-8'))
 
+
     def initialize_question(self):
+        """Initialize the pad that displays the question."""
         self.qpad_pos_x = 0
         self.qpad_pos_y = 0
         self.qpad_extent_x = len(self.question)
@@ -119,6 +149,7 @@ class TermDAG(object):
 
 
     def initialize_help(self):
+        """Initializes the help menu, both the pad and the items."""
         self.hpad = None # Help Pad
         self.hpad_default_cmds = []
         self.hpad_default_cmds.append('h')
@@ -165,11 +196,13 @@ class TermDAG(object):
             hpad_collapse_max_cmd = max(len(self.hpad_default_cmds[i]), hpad_collapse_max_cmd)
             hpad_collapse_max_msg = max(len(self.hpad_default_msgs[i]), hpad_collapse_max_msg)
 
-        # The 2 is for the prefix an suffix space
+        # The 2 is for the prefix and suffix space
         self.hpad_max_x = self.hpad_max_cmd + self.hpad_max_msg + len(' - ') + 2
         self.hpad_max_collapse_x = hpad_collapse_max_msg + hpad_collapse_max_cmd + len(' - ') + 2
 
+
     def add_node(self, name):
+        """Add a node to the internal graph."""
         if len(self._nodes.keys()) == 0:
             self.name = name
         tulipNode = self._tulip.addNode()
@@ -178,7 +211,9 @@ class TermDAG(object):
         self._nodes_list.append(name)
         self.layout = False
 
+
     def add_link(self, source, sink):
+        """Add a link to the internal graph."""
         tulipLink = self._tulip.addEdge(
             self._nodes[source].tulipNode,
             self._nodes[sink].tulipNode
@@ -189,18 +224,9 @@ class TermDAG(object):
         self._nodes[sink].add_in_link(link)
         self.layout = False
 
-    def printonly(self):
-        self.layout_hierarchical()
-        self.grid_colors = []
-        for row in range(self.gridsize[0]):
-            self.grid_colors.append([self.default_color for x in range(self.gridsize[1])])
-        selected = self.node_order[0].name
-        self.select_node(None, selected, self.offset, False)
-
-        for i in range(self.gridsize[0]):
-            print self.print_color_row(i, 0, self.gridsize[1] + 1)
 
     def interactive(self, tulip = False):
+        """Layout the graph and show interactively via curses."""
         if tulip:
             self.layout_hierarchical_tulip()
         else:
@@ -211,17 +237,33 @@ class TermDAG(object):
         # Persist the depiction with stdout:
         self.print_grid(True)
 
+
+    def printonly(self):
+        """Layout the graph and print to stdout. Highlights the first node."""
+        self.layout_hierarchical()
+        self.grid_colors = []
+        for row in range(self.gridsize[0]):
+            self.grid_colors.append([self.default_color for x
+                in range(self.gridsize[1])])
+        selected = self.node_order[0].name
+        self.select_node(None, selected, self.offset, False)
+
+        for i in range(self.gridsize[0]):
+            print self.print_color_row(i, 0, self.gridsize[1] + 1)
+
+
     def report(self):
+        """Report on the success of the layout algorithm."""
         return self.layout_hierarchical()
 
 
     def layout_match(self):
+        """Time and match the tulip layout versus the python re-implementation."""
         import time
         beginTL = time.time()
         self.TL = TermLayout(self)
         self.TL.layout()
         endTL = time.time()
-
 
         self.reset()
         beginTulip = time.time()
@@ -243,7 +285,8 @@ class TermDAG(object):
             coord = viewLayout.getNodeValue(node.tulipNode)
             if coord[0] != self.TL._nodes[node.name].coord[0]:
                 if debug_layout:
-                    print '          ERROR', node.name, coord[0], self.TL._nodes[node.name].coord[0]
+                    print '          ERROR', node.name, coord[0], \
+                        self.TL._nodes[node.name].coord[0]
                 match = False
             else:
                 if debug_layout:
@@ -253,7 +296,8 @@ class TermDAG(object):
             coords = viewLayout.getEdgeValue(link.tulipLink)
             linkTL = self.TL._link_dict[link.id]
             if debug_layout:
-                print link.id, self._nodes[link.source].name, self._nodes[link.sink].name, coords, linkTL.segments
+                print link.id, self._nodes[link.source].name, \
+                    self._nodes[link.sink].name, coords, linkTL.segments
             for i, coord in enumerate(coords):
                 if coord[0] != linkTL.segments[i][0]:
                     if debug_layout:
@@ -262,11 +306,13 @@ class TermDAG(object):
                     continue
 
         if debug_layout:
-            print match, ' TL time', (endTL - beginTL), ' Tulip time', (endTulip - beginTulip)
+            print match, ' TL time', (endTL - beginTL), ' Tulip time', \
+                (endTulip - beginTulip)
         return match, (endTL - beginTL), (endTulip - beginTulip)
 
 
     def layout_hierarchical(self):
+        """Layout the graph into an ASCII Grid."""
         self.TL = TermLayout(self)
         self.TL.layout()
 
@@ -577,6 +623,7 @@ class TermDAG(object):
 
 
     def layout_hierarchical_tulip(self):
+        """Layout the graph based on the Tulip layout."""
         self.gridsize = [0,0]
         self.gridedge = [] # the last char per row
         self.grid = []
@@ -901,6 +948,10 @@ class TermDAG(object):
 
 
     def place_label_left(self, node):
+        """Attempt to place a label to the left of the node on the grid.
+
+           Returns True if successful, False if there is a collision.
+        """
         y = node._row
         x = self.left_offset + node._col - 2 # start one space before node
         characters = len(node.name) + 1 # include space before node
@@ -920,6 +971,10 @@ class TermDAG(object):
 
 
     def place_label_right(self, node):
+        """Attempt to place a label to the right of the node on the grid.
+
+           Returns True if successful, False if there is a collision.
+        """
         y = node._row
         x = self.left_offset + node._col + 2 # start one space after node
         characters = len(node.name) + 1 # include space after node
@@ -940,13 +995,24 @@ class TermDAG(object):
 
     def place_label_bracket(self, node, left_bracket, right_bracket,
         left_pos, right_pos, left_nodes, half_row):
+        """Place a label in the bracketed space. Presently the left_bracket
+           is not used.
 
+           Returns:
+             left_bracket: string representing the running left_bracket
+             right_bracket: string representing the running right_bracket
+             left_pos: the offset into the left bracket
+             right_pos: the offset into the right bracket
+        """
+
+        # First attempt to place the label next to the node.
         if self.place_label_right(node):
             return left_bracket, right_bracket, left_pos, right_pos
         if self.place_label_left(node):
             return left_bracket, right_bracket, left_pos, right_pos
 
         node.use_offset = True
+        # Logic for unused left bracket
         #if node._col < half_row:
         #    if self.debug:
         #        print 'Adding', node.name, 'to left bracket'
@@ -977,6 +1043,7 @@ class TermDAG(object):
 
 
     def place_labels(self, row_nodes):
+        """Places labels for all nodes in a grid row."""
         if self.debug:
             print 'gridsize is', self.gridsize
             print 'offsets are', self.left_offset, self.right_offset
@@ -1070,9 +1137,13 @@ class TermDAG(object):
 
 
     def calculate_max_labels(self, row_nodes):
-        # Figure out the max amount of space needed based on the labels
+        """Calculates the maximum amount of space needed to place labels
+           for a row of nodes."""
         self.row_max = 0
-        half_row = math.floor(self.gridsize[1] / 2) - 1 # subtract for indexing at 0
+
+        # For use in two-pracket case
+        #half_row = math.floor(self.gridsize[1] / 2) - 1 # subtract for indexing at 0
+
         bracket_len = len(' [ ') + len(' ]')
         comma_len = len(', ')
         self.left_offset = 0
@@ -1099,6 +1170,8 @@ class TermDAG(object):
 
 
     def set_to_grid(self, segment): #, row_last):
+        """Converts calculated link segments into positions on the grid.
+           Implements rules for character collisions."""
         success = True
         start = segment.start
         end = segment.end
@@ -1127,6 +1200,8 @@ class TermDAG(object):
                 #   Slash
                 #   Pipe
                 #   Underscore
+                #   
+                #   Crossing slashes get an X
                 if char == '_' and (self.grid[y][x] == '|'
                     or self.grid[y][x] == '/' or self.grid[y][x] == '\\'):
                     segment.gridlist[i] = (x, y, char, False)
@@ -1139,7 +1214,6 @@ class TermDAG(object):
                     and self.grid[y][x] == '|':
                     self.grid[y][x] = char
                 else:
-                    # print 'ERROR at', x, y, ' in segment ', segment, ' : ', char, 'vs', self.grid[y][x]
                     success = False
                     self.grid[y][x] = 'X'
             #if x > row_last[y]:
@@ -1152,7 +1226,9 @@ class TermDAG(object):
         #return row_last, success
         return success
 
+
     def draw_line(self, segment):
+        """Determine grid positions for a line segment."""
         x1 = segment.start._col
         y1 = segment.start._row
         x2 = segment.end._col
@@ -1208,7 +1284,9 @@ class TermDAG(object):
 
         return moves
 
+
     def print_grid(self, with_colors = False):
+        """Print grid to stdout."""
         if not self.layout and not self.debug:
             self.layout_hierarchical()
 
@@ -1228,6 +1306,7 @@ class TermDAG(object):
 
 
     def print_color_row(self, i, start, end):
+        """Print a single text row using ANSI color escape codes."""
         text = self.grid[i]
         colors = self.grid_colors[i]
 
@@ -1247,12 +1326,14 @@ class TermDAG(object):
         string += '\x1b[0m'
         return string
 
+
     def to_ansi_foreground(self, color):
         # Note ANSI offset for foreground color is 30 + ANSI lookup.
         # However, we are off by 1 due to curses, hence the minus one.
         if color != 0:
             color += 30 - 1
         return color
+
 
     def color_string(self, tup):
         string = '(' + str(tup[0])
@@ -1261,7 +1342,9 @@ class TermDAG(object):
         string += ')'
         return string
 
+
     def resize(self, stdscr):
+        """Handle curses resize event."""
         old_height = self.height
         self.height, self.width = stdscr.getmaxyx()
         self.offset = self.height - self.gridsize[0] - 1
@@ -1295,6 +1378,9 @@ class TermDAG(object):
                 self.qpad_pos_y = 0
 
     def center_xy(self, stdscr, x, y):
+        """Center the pad around (x,y). If this moved the pad off the screen,
+           shift show screen is as full as possible with pad while still showing
+           (x,y)."""
         ideal_corner_x = self.pad_corner_x
         ideal_corner_y = self.pad_corner_y
         move_x = False
@@ -1366,6 +1452,7 @@ class TermDAG(object):
             self.refresh_pad()
 
     def collapse_help(self):
+        """Show only the basic help commands."""
         self.hpad.clear()
         self.hpad_extent_x = self.hpad_max_collapse_x # + 1
         self.hpad_extent_y = len(self.hpad_default_cmds) # + 1
@@ -1377,7 +1464,9 @@ class TermDAG(object):
                 len(self.hpad_default_cmds[0]), len(self.hpad_default_msgs[0]))
             self.hpad.addstr(i, 0, helpline, curses.A_REVERSE)
 
+
     def expand_help(self):
+        """Show full help menu."""
         self.hpad.clear()
         self.hpad_extent_y = self.hpad_max_y # + 1
         self.hpad_extent_x = self.hpad_max_x # + 1
@@ -1390,6 +1479,7 @@ class TermDAG(object):
 
 
     def make_hpad_string(self, cmd, msg, cmd_length, msg_length):
+        """Convert command pieces into string for help menu."""
         string = ' '
         cmd_padding = cmd_length - len(cmd)
         msg_padding = msg_length - len(msg)
@@ -1404,19 +1494,25 @@ class TermDAG(object):
         string += ' '
         return string
 
+
     def refresh_hpad(self):
+        """Refresh drawing of help menu."""
         self.hpad.refresh(self.hpad_corner_y, self.hpad_corner_x,
             self.hpad_pos_y, self.hpad_pos_x,
             self.hpad_pos_y + self.hpad_extent_y,
             self.hpad_pos_x + self.hpad_extent_x)
 
+
     def refresh_qpad(self):
+        """Refresh drawing of question."""
         self.qpad.refresh(self.qpad_corner_y, self.qpad_corner_x,
             self.qpad_pos_y, self.qpad_pos_x,
             self.qpad_pos_y + self.qpad_extent_y,
             self.qpad_pos_x + self.qpad_extent_x)
 
+
     def print_interactive(self, stdscr, has_colors = False):
+        """Setup curses pads and run the main interactive loop."""
         self.pad = curses.newpad(self.gridsize[0] + 1, self.gridsize[1] + 1)
         self.pad_corner_y = 0 # upper left position inside pad
         self.pad_corner_x = 0 # position shown in the pad
@@ -1604,8 +1700,15 @@ class TermDAG(object):
                     stdscr.refresh()
 
 
+    # TODO: Replace doPad with None check on stdscr
+    def select_node(self, stdscr, name, offset, doPad = True):
+        """Highlight the give node.
 
-    def select_node(self, stdscr, name, offset):
+           @param stdscr: curses screen object. Use None for print-only
+           @param name: name of node to be selected
+           @param offset: unused
+           @param doPad: If False, skips the curses related computation -- for print-only
+        """
         # Clear existing highlights
         if stdscr:
             self.redraw_default(stdscr, offset)
@@ -1620,8 +1723,16 @@ class TermDAG(object):
 
         return ''
 
+
     def highlight_neighbors(self, stdscr, name, offset, doPad = True):
-        """We assume that the node in question is already highlighted."""
+        """Highlights node neighbors. We assume that the node in question is
+           already highlighted.
+
+           @param stdscr: curses screen object. Use None for print-only
+           @param name: name of node to be selected
+           @param offset: unused
+           @param doPad: If False, skips the curses related computation -- for print-only
+        """
 
         node = self._nodes[name]
 
@@ -1630,6 +1741,15 @@ class TermDAG(object):
 
 
     def highlight_in_neighbors(self, stdscr, name, offset, recurse, doPad = True):
+        """Highlights node in-neighbors. We assume that the node in question is
+           already highlighted.
+
+           @param stdscr: curses screen object. Use None for print-only
+           @param name: name of neighbor node to be highlit
+           @param offset: unused
+           @param recurse: if True, highlights neighbors of neighbors recursively
+           @param doPad: If False, skips the curses related computation -- for print-only
+        """
         node = self._nodes[name]
 
         for link in node._in_links:
@@ -1642,6 +1762,15 @@ class TermDAG(object):
 
 
     def highlight_out_neighbors(self, stdscr, name, offset, recurse, doPad = True):
+        """Highlights node out-neighbors. We assume that the node in question is
+           already highlighted.
+
+           @param stdscr: curses screen object. Use None for print-only
+           @param name: name of neighbor node to be highlit
+           @param offset: unused
+           @param recurse: if True, highlights neighbors of neighbors recursively
+           @param doPad: If False, skips the curses related computation -- for print-only
+        """
         node = self._nodes[name]
 
         for link in node._out_links:
@@ -1654,6 +1783,13 @@ class TermDAG(object):
 
 
     def highlight_segments(self, stdscr, segments, offset, doPad = True):
+        """Highlights given segments.
+
+           @param stdscr: curses screen object. Use None for print-only
+           @param segments: list of segments to be highlit
+           @param offset: unused
+           @param doPad: If False, skips the curses related computation -- for print-only
+        """
         if not doPad:
             self.highlight_segments_printonly(segments, offset)
             return
@@ -1683,7 +1819,13 @@ class TermDAG(object):
                     else:
                         self.pad.addch(y, x, 'X', curses.color_pair(self.neighbor_color))
 
+
     def highlight_segments_printonly(self, segments, offset):
+        """Highlights given segments in internal data structure. Does not use curses.
+
+           @param segments: list of segments to be highlit
+           @param offset: unused
+        """
         for segment in segments:
             for i, coord in enumerate(segment.gridlist):
                 x, y, char, draw = coord
@@ -1708,6 +1850,14 @@ class TermDAG(object):
 
 
     def highlight_node(self, stdscr, name, offset, color, doPad = True):
+        """Highlights given node to the given color.
+
+           @param stdscr: curses window
+           @param name: name of node to be highlit
+           @param offset: unused
+           @param color: curses color pair ID for color to be used
+           @param doPad: TODO FIX ME
+        """
         if name not in self._nodes:
             return ''
         if not doPad:
@@ -1731,6 +1881,12 @@ class TermDAG(object):
 
 
     def highlight_node_printonly(self, name, offset, color):
+        """Highlights given node to the given color in the internal data structure.
+
+           @param name: name of node to be highlit
+           @param offset: unused
+           @param color: curses color pair ID for color to be used
+        """
         node = self._nodes[name]
         self.grid_colors[node._row][self.left_offset + node._col] = color
         label_offset = 0
@@ -1742,6 +1898,11 @@ class TermDAG(object):
         return name
 
     def redraw_default(self, stdscr, offset):
+        """Redraws the default (unhighlighted) graph to curses.
+
+           @param stdscr: curses window
+           @param offset: unused
+        """
         for h in range(self.gridsize[0]):
             for w in range(self.gridsize[1]):
                 self.grid_colors[h][w] = self.default_color
@@ -1751,6 +1912,7 @@ class TermDAG(object):
                     continue
 
     def write_tulip_positions(self):
+        """Writes out the Tulip positions for debugging."""
         for node in self._nodes.values():
             print node.name, node._x, node._y
             if self.TL and self.TL.is_valid():
@@ -1761,18 +1923,21 @@ class TermDAG(object):
             if self.TL and self.TL.is_valid():
                 print "TL: ", self.TL.get_link_segments(link.id)
 
+
     def print_pqueue(self):
+        """Writes out the priority queue for debugging."""
         return
         foo = sorted(self.pqueue)
         print " * PQUEUE: "
         for bar in foo:
             print "   ", bar
 
+
     def find_crossings(self, segments):
         """Bentley-Ottmann line-crossing detection.
 
-           We sweep from bottom to top because the Tulip y's are
-           negative values. We think of this as just having the DAG
+           We sweep from bottom to top because the layout y's are
+           negative values. The intuition is having the DAG
            upside down and sweeping from top to bottom.
         """
         self.bst = TermBST() # BST of segments crossing L
@@ -1928,6 +2093,7 @@ class TermDAG(object):
 
 
 class TermBST(object):
+    """Binary Search Tree class for overlap detection."""
 
     def __init__(self):
         self.root = None
@@ -2095,6 +2261,7 @@ class TermBST(object):
 
 
 class TermBSTNode(object):
+    """Class for Binary Search Tree node struct."""
 
     def __init__(self, segment):
         self.segment = segment
@@ -2102,14 +2269,6 @@ class TermBSTNode(object):
         self.right = None
         self.parent = None
 
-
-class SplitGroup(object):
-    def __init__(self, starty, destination):
-        self.starty = starty
-        self.destination = destination
-
-        self.segments = set()
-        self.crossing_points = dict() # x -> y
 
 class TermSegment(object):
     """A straight-line portion of a drawn poly-line in the graph rendering."""
@@ -2325,6 +2484,7 @@ class TermSegment(object):
 
 
 class TermNode(object):
+    """Class for internal node representation."""
 
     def __init__(self, node_id, tulip, real = True):
         self.name = node_id
@@ -2399,7 +2559,9 @@ class TermNode(object):
             cpy.add_out_link(link.id)
         return cpy
 
+
 class TermLink(object):
+    """Class for internal link representation."""
 
     def __init__(self, link_id, source_id, sink_id, tlp):
         self.id = link_id
@@ -2412,14 +2574,20 @@ class TermLink(object):
         self.segments = []
 
     def reset(self):
+        """Reset internal structures for layout information."""
         self._coords = None
 
         self.segments = []
 
     def skeleton_copy(self):
+        """Copy with just enough information for layout."""
         return TermLink(self.id, self.source, self.sink, None)
 
+
 class TermLayout(object):
+    """Class for calculating graph layout. This implements the
+       Hierarchical Layout of D. Auber from the Tulip graph drawing
+       framework."""
 
     def __init__(self, graph, sweeps = 4):
         self.original = graph
@@ -2433,9 +2601,24 @@ class TermLayout(object):
         self._running_neighbors = dict()
         self._links = list()
         self._link_dict = dict()
+        self._debug_names = dict() # Link debug names
+
+        # ----------------------------------------------------
+        # Structures to match C++ layout version:
+        #
+        # For keeping nodes in added order
+        self._nodes_list = list()
+        # For keeping track of which nodes were added
+        self._added = dict()
+        # For keeping track of neighbor add order
+        self._running_neighbors = dict()
+        # For keeping track of which links were modified
         self._modified_links = set()
-        self._debug_names = dict()
+        # For keep track of which links were in the original version
         self._original_links = list()
+        # ----------------------------------------------------
+
+        # Make a copy so as not to clobber original data
         for name in graph._nodes_list:
             self._nodes_list.append(name)
             self._added[name] = 0
@@ -2453,6 +2636,7 @@ class TermLayout(object):
             self._running_neighbors[link.sink].add(link.source)
 
 
+        # Layout parameters
         self.grid = []
         self.num_sweeps = sweeps
         self.spacing = 5.0
@@ -2460,17 +2644,34 @@ class TermLayout(object):
 
 
     def is_valid(self):
+        """True if layout has been completed."""
         return self.valid
 
     def get_node_coord(self, name):
+        """Returns the node's coordinate.
+
+           @param name: node name
+           @return Coordinate according to layout
+        """
         return self._nodes[name].coord
 
     def get_link_segments(self, name):
+        """Returns the list of a links segments.
+
+           @param name: the link id
+           @return List of segment end point coordinates.
+        """
         return self._link_dict[name].segments
 
+
     def RTE(self, source, rankSizes):
-        # Reingold-Tilford Extended
-        # rankSizes is a dict[rank] = size (the latter being a double)
+        """Implements the Reingold-Tilford Extended algorithm to match
+           the Tulip version.
+
+           @param source: the added source node.
+           @oaram rankSizes: a dictionary tracking the number of elements
+                             in each rank.
+        """
         relativePosition = dict() # node -> double
 
         # TreePlace -- figure out LR tree extents, put placements in
@@ -2484,8 +2685,8 @@ class TermLayout(object):
             print "Tree placed, calculating coords...."
         self.calcLayout(source, relativePosition, 0, 0, 0, rankSizes)
 
-        # Ortho is true -- do edge bends -- not sure this makes sense in our
-        # case 
+        # Ortho is true -- do edge bends
+        # This may be unnecessary
         if debug_layout:
             print "Layout calc'd. Doing edge bends inside RTE..."
         for link in self._links:
@@ -2501,9 +2702,20 @@ class TermLayout(object):
 
 
     def calcLayout(self, node, relativePosition, x, y, rank, rankSizes, indent = "  "):
-        # All nodes are the same size, so we don't have to do spacing
-        # weirdness
-        node.coord = (x + relativePosition[node], -1 * self.spacing * rank) # + rankSizes[rank]/2.0))
+        """Calculates the position of a node.
+
+           @param node: a node object to be placed
+           @param relativePosition: dict containing the relative position of the nodes to
+                                    the others in the layout.
+           @param x: x offset so far
+           @param y: y offset so far
+           @param rank: the depth of the current node
+           @param rankSizes: dict of how many ranks per node... only sused for spacing, REMOVE ME
+           @param indent: for debugging
+
+           Note: as all nodes are the same size, we don't have to worry about spacing.
+        """
+        node.coord = (x + relativePosition[node], -1 * self.spacing * rank)
         if debug_layout:
             print indent, node.name, 'with position', x, relativePosition[node], node.coord
         for linkid in node._out_links:
@@ -2525,6 +2737,12 @@ class TermLayout(object):
 
 
     def treePlace(self, node, relativePosition, indent = " " ):
+        """Calculate the positions of the subtrees.
+
+           @param node: root node of subtree to be placed
+           @param relativePosition: dict keeping track of the relative positions of the nodes
+           @param indent: for debugging.
+        """
         if len(node._out_links) == 0:
             if debug_layout:
                 print indent, node.name, 'place with zero outlinks (-0.5, 0.5, 1)'

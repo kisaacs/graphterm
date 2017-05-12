@@ -2,7 +2,6 @@ import heapq
 from heapq import *
 import curses
 import curses.ascii
-from tulip import *
 import math
 
 debug_layout = False
@@ -21,7 +20,6 @@ class TermDAG(object):
         self._nodes_list = list()
         self._links = list()
         self._positions_set = False
-        self._tulip = tlp.newGraph()
         self.gridsize = [0,0]
         self.gridedge = [] # the last char per row
         self.grid = []
@@ -36,7 +34,6 @@ class TermDAG(object):
         self.layout = False
         self.debug = False
         self.is_interactive = True
-        self.output_tulip = False
         self.name = 'default'
 
         self.left_offset = 0
@@ -205,8 +202,7 @@ class TermDAG(object):
         """Add a node to the internal graph."""
         if len(self._nodes.keys()) == 0:
             self.name = name
-        tulipNode = self._tulip.addNode()
-        node = TermNode(name, tulipNode)
+        node = TermNode(name)
         self._nodes[name] = node
         self._nodes_list.append(name)
         self.layout = False
@@ -214,23 +210,16 @@ class TermDAG(object):
 
     def add_link(self, source, sink):
         """Add a link to the internal graph."""
-        tulipLink = self._tulip.addEdge(
-            self._nodes[source].tulipNode,
-            self._nodes[sink].tulipNode
-        )
-        link = TermLink(len(self._links), source, sink, tulipLink)
+        link = TermLink(len(self._links), source, sink)
         self._links.append(link)
         self._nodes[source].add_out_link(link)
         self._nodes[sink].add_in_link(link)
         self.layout = False
 
 
-    def interactive(self, tulip = False):
+    def interactive(self):
         """Layout the graph and show interactively via curses."""
-        if tulip:
-            self.layout_hierarchical_tulip()
-        else:
-            self.layout_hierarchical()
+        self.layout_hierarchical()
         if self.is_interactive:
             curses.wrapper(interactive_helper, self)
 
@@ -255,60 +244,6 @@ class TermDAG(object):
     def report(self):
         """Report on the success of the layout algorithm."""
         return self.layout_hierarchical()
-
-
-    def layout_match(self):
-        """Time and match the tulip layout versus the python re-implementation."""
-        import time
-        beginTL = time.time()
-        self.TL = TermLayout(self)
-        self.TL.layout()
-        endTL = time.time()
-
-        self.reset()
-        beginTulip = time.time()
-        viewLabel = self._tulip.getStringProperty('viewLabel')
-        for node in self._nodes.values():
-            viewLabel[node.tulipNode] = node.name
-
-        params = tlp.getDefaultPluginParameters('Hierarchical Graph', self._tulip)
-        params['orientation'] = 'vertical'
-        params['layer spacing'] = 5
-        params['node spacing'] = 5
-        viewLayout = self._tulip.getLayoutProperty('viewLayout')
-
-        self._tulip.applyLayoutAlgorithm('Hierarchical Graph', viewLayout, params)
-        endTulip = time.time()
-
-        match = True
-        for node in self._nodes.values():
-            coord = viewLayout.getNodeValue(node.tulipNode)
-            if coord[0] != self.TL._nodes[node.name].coord[0]:
-                if debug_layout:
-                    print '          ERROR', node.name, coord[0], \
-                        self.TL._nodes[node.name].coord[0]
-                match = False
-            else:
-                if debug_layout:
-                    print node.name, coord[0], self.TL._nodes[node.name].coord[0]
-
-        for link in self._links:
-            coords = viewLayout.getEdgeValue(link.tulipLink)
-            linkTL = self.TL._link_dict[link.id]
-            if debug_layout:
-                print link.id, self._nodes[link.source].name, \
-                    self._nodes[link.sink].name, coords, linkTL.segments
-            for i, coord in enumerate(coords):
-                if coord[0] != linkTL.segments[i][0]:
-                    if debug_layout:
-                        print '          ERROR', link.id, coords, linkTL.segments
-                    match = False
-                    continue
-
-        if debug_layout:
-            print match, ' TL time', (endTL - beginTL), ' Tulip time', \
-                (endTulip - beginTulip)
-        return match, (endTL - beginTL), (endTulip - beginTulip)
 
 
     def layout_hierarchical(self):
@@ -374,7 +309,7 @@ class TermDAG(object):
                     segment.original_end = placer
                     placer.add_in_segment(segment)
                 else:
-                    placer = TermNode("", None, False)
+                    placer = TermNode("", False)
                     self.placers.add(placer)
                     coord_to_node[(coord[0], coord[1])] = placer
                     coord_to_placer[(coord[0], coord[1])] = placer
@@ -407,8 +342,6 @@ class TermDAG(object):
             self.write_tulip_positions();
             print "xset", sorted(list(xset))
             print "yset", sorted(list(yset))
-        if self.output_tulip:
-            tlp.saveGraph(self._tulip, self.name + '.tlp')
 
         # Find crossings and create new segments based on them
         self.find_crossings(segments)
@@ -469,333 +402,7 @@ class TermDAG(object):
             if (x,placer_y) in coord_to_node:
                 placer = coord_to_node[(x,placer_y)]
             else:
-                placer = TermNode('', None, False)
-                placer._x = x
-                placer._y = placer_y
-                coord_to_node[(x,placer_y)] = placer
-                coord_to_placer[(x,placer_y)] = placer
-
-            # Create segment break
-            for name in k:
-                segment = self.segment_ids[name]
-                if self.debug:
-                    print "Creating new segment from:", segment, "at", placer._x, placer._y
-                new_segment = segment.split(placer, bundle, self.debug)
-                if self.debug:
-                    print "    Split: ", segment
-                    print "  Created: ", new_segment
-                segments.add(new_segment)
-            xset.add(x)
-            yset.add(placer_y)
-
-        # Based on the tulip layout, do the following:
-        xsort = sorted(list(xset))
-        ysort = sorted(list(yset))
-        ysort.reverse()
-        segment_pos = dict()
-        column_multiplier = 2
-        row_multiplier = 2
-        self.gridsize = [len(ysort) - len(node_yset) + len(node_yset) * row_multiplier,
-            len(xsort) * column_multiplier]
-        y = 0
-        for ypos in ysort:
-            segment_pos[ypos] = y
-            if ypos in node_yset:
-                y += 1
-            y += 1
-
-        if self.debug:
-            print self.gridsize
-
-        row_lookup = dict()
-        col_lookup = dict()
-        row_nodes = dict()
-        for i, x in enumerate(xsort):
-            col_lookup[x] = i
-        for i, y in enumerate(ysort):
-            row_lookup[y] = i
-
-        # Figure out how nodes map to rows so we can figure out label
-        # placement allowances
-        self.row_last = [0 for x in range(self.gridsize[0])]
-        self.row_last_mark = [0 for x in range(self.gridsize[0])]
-        self.row_first = [self.gridsize[1] for x in range(self.gridsize[0])]
-        self.row_first_mark = [self.gridsize[1] for x in range(self.gridsize[0])]
-        for coord, node in coord_to_node.items():
-            node._row = segment_pos[coord[1]]
-            node._col = column_multiplier * col_lookup[coord[0]]
-            if node.real:
-                if node._row not in row_nodes:
-                    row_nodes[node._row] = []
-                row_nodes[node._row].append(node)
-                if node._col > self.row_last[node._row]:
-                    self.row_last[node._row] = node._col
-                    self.row_last_mark[node._row] = node._col
-                if node._col < self.row_first[node._row]:
-                    self.row_first[node._row] = node._col
-                    self.row_first_mark[node._row] = node._col
-
-        # Sort the labels by left-right position
-        for row, nodes in row_nodes.items():
-            row_nodes[row] = sorted(nodes, key = lambda node: node._col)
-
-        # Find the node order:
-        self.node_order = sorted(self._nodes.values(),
-            key = lambda node: node._row * 1e6 + node._col)
-        for i, node in enumerate(self.node_order):
-            node.order = i
-
-        # Create the grid
-        self.grid = []
-        for i in range(self.gridsize[0]):
-            self.grid.append([' ' for j in range(self.gridsize[1])])
-            self.gridedge.append(0)
-
-        # Add the nodes in the grid
-        for coord, node in coord_to_node.items():
-            node._row = segment_pos[coord[1]]
-            node._col = column_multiplier * col_lookup[coord[0]]
-            if node.real:
-                self.grid[node._row][self.left_offset + node._col] = 'o'
-
-                if self.debug:
-                    print 'Drawing node at', node._row, self.left_offset + node._col
-                    self.print_grid()
-
-
-        # Sort segments on drawing difficulty -- this is useful for 
-        # debugging collisions. It will eventually be used to help
-        # re-route collisions.
-        segments = sorted(segments, key = lambda x: x.for_segment_sort())
-
-        # Add segments to the grid
-        status = 'passed'
-        for segment in segments:
-            segment.gridlist =  self.draw_line(segment)
-            err = self.set_to_grid(segment) #, self.row_last)
-            if not err:
-                status = 'drawing'
-
-        self.grid = []
-        self.gridedge = []
-        self.grid_colors = []
-        self.calculate_max_labels(row_nodes)
-
-        # Max number of columns needed -- we add one for a space
-        # between the graph and the labels.
-        self.gridsize[1] = self.row_max + 1
-
-        # Re-create the grid for labels
-        for i in range(self.gridsize[0]):
-            self.grid.append([' ' for j in range(self.gridsize[1])])
-            self.gridedge.append(0)
-
-        # Re-Add the nodes in the grid
-        for coord, node in coord_to_node.items():
-            node._row = segment_pos[coord[1]]
-            node._col = column_multiplier * col_lookup[coord[0]]
-            if node.real:
-                self.grid[node._row][self.left_offset + node._col] = 'o'
-
-                if self.debug:
-                    print 'Drawing node at', node._row, self.left_offset + node._col
-                    self.print_grid()
-
-        # Re-Add segments to the grid
-        status = 'passed'
-        for segment in segments:
-            segment.gridlist =  self.draw_line(segment)
-            err = self.set_to_grid(segment) #, self.row_last)
-            if not err:
-                status = 'drawing'
-
-        # Add labels to the grid
-        self.place_labels(row_nodes)
-
-        if self.debug:
-            self.print_grid()
-            for segment in segments:
-                print segment, segment.gridlist
-
-        self.layout = True
-        return status
-
-
-
-    def layout_hierarchical_tulip(self):
-        """Layout the graph based on the Tulip layout."""
-        self.gridsize = [0,0]
-        self.gridedge = [] # the last char per row
-        self.grid = []
-        self.grid_colors = []
-        self.row_max = 0
-        self.row_names = dict()
-        viewLabel = self._tulip.getStringProperty('viewLabel')
-        for node in self._nodes.values():
-            viewLabel[node.tulipNode] = node.name
-
-        params = tlp.getDefaultPluginParameters('Hierarchical Graph', self._tulip)
-        params['orientation'] = 'vertical'
-        params['layer spacing'] = 5
-        params['node spacing'] = 5
-        viewLayout = self._tulip.getLayoutProperty('viewLayout')
-
-        self._tulip.applyLayoutAlgorithm('Hierarchical Graph', viewLayout, params)
-
-        xset = set()
-        yset = set()
-        node_yset = set()
-        segments = set()
-        segment_lookup = dict()
-        self.segment_ids = dict()
-        coord_to_node = dict()
-        coord_to_placer = dict()
-
-        # Convert Tulip layout to something we can manipulate for both nodes
-        # and links.
-        maxy = -1e9
-        self.min_tulip_x = 1e9
-        self.max_tulip_x = -1e9
-        for node in self._nodes.values():
-            coord = viewLayout.getNodeValue(node.tulipNode)
-            if debug_layout:
-                print "Node", node.name, coord
-            node._x = coord[0]
-            node._y = coord[1]
-            xset.add(coord[0])
-            yset.add(coord[1])
-            node_yset.add(coord[1])
-            coord_to_node[(coord[0], coord[1])] = node
-            if coord[1] > maxy:
-                maxy = coord[1]
-                self.name = node.name
-            self.max_tulip_x = max(self.max_tulip_x, coord[0])
-            self.min_tulip_x = min(self.min_tulip_x, coord[0])
-
-        segmentID = 0
-        for link in self._links:
-            link._coords = viewLayout.getEdgeValue(link.tulipLink)
-            if debug_layout:
-                print "Link", link.source, link.sink, link._coords
-            last = (self._nodes[link.source]._x, self._nodes[link.source]._y)
-            for coord in link._coords:
-                xset.add(coord[0])
-                yset.add(coord[1])
-                if (last[0], last[1], coord[0], coord[1]) in segment_lookup:
-                    segment = segment_lookup[(last[0], last[1], coord[0], coord[1])]
-                else:
-                    segment = TermSegment(last[0], last[1], coord[0], coord[1], segmentID)
-                    self.segment_ids[segmentID] = segment
-                    segmentID += 1
-                    segments.add(segment)
-                    segment_lookup[(last[0], last[1], coord[0], coord[1])] = segment
-                    segment.paths.add((link.source, link.sink))
-                link.segments.append(segment)
-                segment.links.append(link)
-                segment.start = coord_to_node[last]
-
-                if (coord[0], coord[1]) in coord_to_node:
-                    placer = coord_to_node[(coord[0], coord[1])]
-                    segment.end = placer
-                    segment.original_end = placer
-                    placer.add_in_segment(segment)
-                else:
-                    placer = TermNode("", None, False)
-                    self.placers.add(placer)
-                    coord_to_node[(coord[0], coord[1])] = placer
-                    coord_to_placer[(coord[0], coord[1])] = placer
-                    placer._x = coord[0]
-                    placer._y = coord[1]
-                    segment.end = placer
-                    segment.original_end = placer
-                    placer.add_in_segment(segment)
-
-                last = (coord[0], coord[1])
-
-            if (last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y) in segment_lookup:
-                segment = segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)]
-            else:
-                segment = TermSegment(last[0], last[1], self._nodes[link.sink]._x,
-                    self._nodes[link.sink]._y, segmentID)
-                self.segment_ids[segmentID] = segment
-                segment.paths.add((link.source, link.sink))
-                segmentID += 1
-                segments.add(segment)
-                segment_lookup[(last[0], last[1], self._nodes[link.sink]._x, self._nodes[link.sink]._y)] = segment
-            link.segments.append(segment)
-            segment.links.append(link)
-            placer = coord_to_node[last]
-            segment.start = placer
-            segment.end = self._nodes[link.sink]
-            segment.original_end = self._nodes[link.sink]
-
-        if self.debug:
-            self.write_tulip_positions();
-            print "xset", sorted(list(xset))
-            print "yset", sorted(list(yset))
-        if self.output_tulip:
-            tlp.saveGraph(self._tulip, self.name + '.tlp')
-
-        # Find crossings and create new segments based on them
-        self.find_crossings(segments)
-        if self.debug:
-            print "CROSSINGS ARE: "
-            #return
-
-        # Consolidate crossing points
-        crossings_points = dict() # (x, y) -> set of segments
-        for k, v in self.crossings.items(): # crossings is (seg1, seg2) -> (x, y)
-            if v not in crossings_points:
-                crossings_points[v] = set()
-            crossings_points[v].add(k[0])
-            crossings_points[v].add(k[1])
-            self.segment_ids[k[0]].addCrossing(self.segment_ids[k[1]], v)
-            self.segment_ids[k[1]].addCrossing(self.segment_ids[k[0]], v)
-
-        for placer in self.placers:
-            placer.findCrossingHeights(self.min_tulip_x, self.max_tulip_x, self.debug)
-
-        # For each crossing, figure out if the end point of either already has
-        # a set of height for that y value. Cases:
-        # Neither has one: proceed as normal
-        # One has one: shift the crossing to that y value
-        # More than one has them: Ignore for now
-        for v, k in crossings_points.items():
-            x, y = v
-            if self.debug:
-                print k, v
-            special_heights = list()
-            if self.debug:
-                print "Testing point', v"
-            for name in k:
-                segment = self.segment_ids[name]
-                #print 'Testing point', v, 'for segment', segment, 'with height', segment.end.crossing_heights
-                #print '  Is', segment.y1, 'there?'
-                if self.debug:
-                    print '   segment', segment.name, 'at end', segment.origin.original_end._x, segment.origin.original_end._y
-                if segment.y1 in segment.origin.original_end.crossing_heights:
-                    if self.debug:
-                        print '       found at height', segment.origin.original_end.crossing_heights[segment.y1]
-                    special_heights.append(segment.origin.original_end.crossing_heights[segment.y1])
-
-            placer_y = y
-            bundle = False
-            #print "Length of spcil heights is", len(special_heights)
-            if len(special_heights) == 1:
-                #print 'setting placer y to', special_heights[0]
-                placer_y = special_heights[0]
-                bundle = True
-            elif len(special_heights) > 1:
-                #print "Special heights are", special_heights
-                #for name in k:
-                #    print " ---", self.segment_ids[name]
-                continue
-
-            # Get placer
-            if (x,placer_y) in coord_to_node:
-                placer = coord_to_node[(x,placer_y)]
-            else:
-                placer = TermNode('', None, False)
+                placer = TermNode('', False)
                 placer._x = x
                 placer._y = placer_y
                 coord_to_node[(x,placer_y)] = placer
@@ -993,16 +600,16 @@ class TermDAG(object):
 
         return True
 
+
     def place_label_bracket(self, node, left_bracket, right_bracket,
         left_pos, right_pos, left_nodes, half_row):
         """Place a label in the bracketed space. Presently the left_bracket
            is not used.
 
-           Returns:
-             left_bracket: string representing the running left_bracket
-             right_bracket: string representing the running right_bracket
-             left_pos: the offset into the left bracket
-             right_pos: the offset into the right bracket
+           @returns left_bracket: string representing the running left_bracket
+           @returns right_bracket: string representing the running right_bracket
+           @returns left_pos: the offset into the left bracket
+           @returns right_pos: the offset into the right bracket
         """
 
         # First attempt to place the label next to the node.
@@ -2486,7 +2093,7 @@ class TermSegment(object):
 class TermNode(object):
     """Class for internal node representation."""
 
-    def __init__(self, node_id, tulip, real = True):
+    def __init__(self, node_id, real = True):
         self.name = node_id
         self._in_links = list()
         self._out_links = list()
@@ -2497,7 +2104,6 @@ class TermNode(object):
         self._row = 0 # Int
         self.label_pos = -1 # Int
         self.use_offset = True
-        self.tulipNode = tulip
         self.coord = (-1, -1)
 
         self.real = real # Real node or segment connector?
@@ -2552,7 +2158,7 @@ class TermNode(object):
 
 
     def skeleton_copy(self):
-        cpy = TermNode(self.name, None, self.real)
+        cpy = TermNode(self.name, self.real)
         for link in self._in_links:
             cpy.add_in_link(link.id)
         for link in self._out_links:
@@ -2563,11 +2169,10 @@ class TermNode(object):
 class TermLink(object):
     """Class for internal link representation."""
 
-    def __init__(self, link_id, source_id, sink_id, tlp):
+    def __init__(self, link_id, source_id, sink_id):
         self.id = link_id
         self.source = source_id
         self.sink = sink_id
-        self.tulipLink = tlp
         self._coords = None
         self._edgeLength = 1
 
@@ -2581,7 +2186,7 @@ class TermLink(object):
 
     def skeleton_copy(self):
         """Copy with just enough information for layout."""
-        return TermLink(self.id, self.source, self.sink, None)
+        return TermLink(self.id, self.source, self.sink)
 
 
 class TermLayout(object):
@@ -3126,7 +2731,7 @@ class TermLayout(object):
         visited = dict()
 
         # Add temporary sink and set visited
-        sink = TermNode('sink', None, False)
+        sink = TermNode('sink', False)
         self._added['sink'] = 0
         self._running_neighbors['sink'] = set()
         self._running_neighbors['sink'].add('sink')
@@ -3136,7 +2741,7 @@ class TermLayout(object):
             visited[node.name] = False
             if not node._out_links:
                 linkName = node.name + '-sink'
-                sinkLink = TermLink(linkName, node.name, 'sink', None)
+                sinkLink = TermLink(linkName, node.name, 'sink')
                 self._links.append(sinkLink)
                 node.add_out_link(linkName)
                 sink.add_in_link(linkName)
@@ -3301,7 +2906,7 @@ class TermLayout(object):
                 end._in_links.remove(link.id)
                 atRank = startRank + 1
                 newName = nameBase + '-1' #+ str(atRank)
-                newNode = TermNode(newName, None, False)
+                newNode = TermNode(newName, False)
                 newNode.rank = atRank
                 self._nodes[newName] = newNode
                 self._nodes_list.append(newName)
@@ -3313,7 +2918,7 @@ class TermLayout(object):
                 link.sink = newName
                 newNode.add_in_link(link.id)
                 newLinkName = str(link.id) + '-1' #+ str(atRank)
-                newLink = TermLink(newLinkName, newName, end.name, None)
+                newLink = TermLink(newLinkName, newName, end.name)
                 self._debug_names[newLinkName] = self._debug_names[link.id] + '-1'
                 newNode.add_out_link(newLink.id)
                 link.children.append(newLink)
@@ -3326,7 +2931,7 @@ class TermLayout(object):
                 if delta > 2:
                     atRank = endRank - 1
                     secondName = nameBase + '-2' #+ str(atRank)
-                    secondNode = TermNode(secondName, None, False)
+                    secondNode = TermNode(secondName, False)
                     secondNode.rank = atRank
                     self._nodes[secondName] = secondNode
                     self._nodes_list.append(secondName)
@@ -3341,7 +2946,7 @@ class TermLayout(object):
                     newLink._edgeLength = delta - 2
                     secondNode.add_in_link(newLink.id)
                     secondLinkName = str(link.id) + '-2'# + str(atRank)
-                    secondLink = TermLink(secondLinkName, secondName, end.name, None)
+                    secondLink = TermLink(secondLinkName, secondName, end.name)
                     self._debug_names[secondLinkName] = self._debug_names[link.id] + '-2'
                     secondNode.add_out_link(secondLink.id)
                     link.children.append(secondLink)
@@ -3379,14 +2984,14 @@ class TermLayout(object):
             lastLink = link
             while atRank < endRank:
                 newName = nameBase + '-' + str(atRank)
-                newNode = TermNode(newName, None, False)
+                newNode = TermNode(newName, False)
                 newNode.rank = atRank
                 self._nodes[newName] = newNode
 
                 lastLink.sink = newName
                 newNode.add_in_link(lastLink.id)
                 newLinkName = str(link.id) + '-' + str(atRank)
-                newLink = TermLink(newLinkName, newName, end.name, None)
+                newLink = TermLink(newLinkName, newName, end.name)
                 newNode.add_out_link(newLink.id)
                 lastLink = newLink
                 link.children.append(newLink)
@@ -3417,14 +3022,14 @@ class TermLayout(object):
         #if len(sources) == 1:
         #    return sources[0]
         #else:
-        source = TermNode('source', None, False)
+        source = TermNode('source', False)
         self._nodes['source'] = source
         self._nodes_list.append('source')
         self._added['source'] = 0
         self._running_neighbors['source'] = set()
         for i, node in enumerate(sources):
             linkName = 'source-' + str(i)
-            link = TermLink(linkName, 'source', node.name, None)
+            link = TermLink(linkName, 'source', node.name)
             source.add_out_link(linkName)
             node.add_in_link(linkName)
             self._links.append(link)

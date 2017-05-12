@@ -6,7 +6,7 @@ import math
 from tulip import *
 import math
 
-debug_layout = False
+debug_layout = True
 
 class TermDAG(object):
 
@@ -2523,10 +2523,10 @@ class TermLayout(object):
             #    rank + 1, rankSizes)
 
 
-    def treePlace(self, node, relativePosition, indent = "  " ):
+    def treePlace(self, node, relativePosition, indent = " " ):
         if len(node._out_links) == 0:
             if debug_layout:
-                print indent, node.name, 'place with zero outlinks [(-0.5, 0.5, 1)]'
+                print indent, node.name, 'place with zero outlinks (-0.5, 0.5, 1)'
             relativePosition[node] = 0
             return [(-0.5, 0.5, 1)] # Triple L, R, size
 
@@ -2536,7 +2536,7 @@ class TermLayout(object):
         leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition,
             indent + "  " )
         if debug_layout:
-            print indent, node.name, "left tree is", leftTree
+            print indent, node.name, "left tree is:", leftTree
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
         # useLength
@@ -2555,7 +2555,7 @@ class TermLayout(object):
                 print indent, node.name, 'placing right tree based on', self._debug_names[linkid]
             rightTree = self.treePlace(self._nodes[link.sink], relativePosition, indent + "  ")
             if debug_layout:
-                print indent, node.name, "found right tree is", rightTree, " and left tree is ", leftTree
+                print indent, node.name, "found right tree is:", rightTree, "and left tree is", leftTree
 
 
             if link._edgeLength > 1:
@@ -2567,7 +2567,7 @@ class TermLayout(object):
 
             decal = self.calcDecal(leftTree, rightTree)
             if debug_layout:
-                print indent, node.name, 'Calculating decal of', decal
+                print indent, node.name, 'calculating decal of', decal
             tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
 
             if debug_layout:
@@ -2618,7 +2618,9 @@ class TermLayout(object):
             print indent, 'Beginning mergeLR loop of left', left, 'and right', right
         while itL < len(left) and itR < len(right):
             if debug_layout:
-                print indent, 'Beginning itL', itL, 'itR', itR, 'left', left, 'right', right
+                print indent, 'Beginning itL', list(left[itL]), 'itR', list(right[itR])
+                print indent, ' left:', left
+                print indent, ' right:', right
             minSize = min(left[itL][size] - iL, right[itR][size] - iR)
             tmp = (left[itL][L], right[itR][R] + decal, minSize)
 
@@ -2665,7 +2667,9 @@ class TermLayout(object):
                 iR = 0
 
             if debug_layout:
-                print indent, 'Ending itL', itL, 'itR', itR, 'iL', iL, 'iR', iR, 'left', left, 'right', right
+                print indent, 'Ending iL', iL, 'iR', iR
+                print indent, ' left:', left
+                print indent, ' right:', right
 
         if itL < len(left) and iL != 0:
             tmp = (left[itL][L], left[itL][R], left[itL][size] - iL)
@@ -2757,8 +2761,8 @@ class TermLayout(object):
             self.reduceCrossings(source_node, embedding)
             # TODO: Set Edge Order ? 
 
-            if debug_layout:
-                print "Crossings reduced, creating spanning tree..."
+            #if debug_layout:
+            #    print "Crossings reduced, creating spanning tree..."
             self.createSpanningTree(embedding)
 
         if debug_layout:
@@ -2767,22 +2771,22 @@ class TermLayout(object):
         rankSizes = []
         for row in self.grid:
             rankSizes.append(len(row))
-        if debug_layout:
-            print "RTE time... "
+        #if debug_layout:
+        #    print "RTE time... "
         self.RTE(source_node, rankSizes) #self.grid)
-        if debug_layout:
-            print "RTE clear."
+        #if debug_layout:
+        #    print "RTE clear."
 
         # Do Edge Bends
-        if debug_layout:
-            print "Computing edge bends..."
+        #if debug_layout:
+        #    print "Computing edge bends..."
         self.computeEdgeBends()
-        if debug_layout:
-            print "Bends computed..."
+        #if debug_layout:
+        #    print "Bends computed..."
 
-        if debug_layout:
-            self.printNodeCoords()
-            self.printEdgeCoords()
+        #if debug_layout:
+        #    self.printNodeCoords()
+        #    self.printEdgeCoords()
         # We disallow self loops, so nothing to do here
 
         # Adjust edge/node overlap -- skip for now
@@ -2819,8 +2823,8 @@ class TermLayout(object):
                 node._in_links = [ node._in_links[half] ]
                 if debug_layout:
                     print "   Keeping", node._in_links[0], self._debug_names[node._in_links[0]]
-            elif debug_layout and len(node._in_links) == 1:
-                print "   Keeping", node._in_links[0], self._debug_names[node._in_links[0]]
+            #elif debug_layout and len(node._in_links) == 1:
+            #    print "   Keeping", node._in_links[0], self._debug_names[node._in_links[0]]
         for name in self._nodes_list:
             node = self._nodes[name]
             toRemove = list()
@@ -2913,10 +2917,10 @@ class TermLayout(object):
         degrees = self.createFakeDegrees()
         for a, row in enumerate(self.grid):
             if debug_layout:
-                print "On row", a
+                print "Setting node row", a
             for i, node in enumerate(row):
                 if debug_layout:
-                    print "Setting node", node.name, "embedding to", i, "with degree", degrees[node.name]
+                    print "Setting node", node.name, "embedding to", i, "and degree is", degrees[node.name]
                 embedding[node.name] = i
 
         maxRank = len(self.grid) - 1
@@ -2924,13 +2928,13 @@ class TermLayout(object):
             # Up Sweep
             for i in range(maxRank, -1, -1):
                 if debug_layout:
-                    print "  Two layer on", i, "True"
+                    print "  Two-layer on", i, "true "
                 self.reduceTwoLayerCrossings(embedding, i, True, degrees)
 
             # Down Sweep
             for i in range(maxRank + 1): # was 'maxDepth' -- not sure what I was thinking there
                 if debug_layout:
-                    print "  Two layer on", i, "False"
+                    print "  Two-layer on", i, "false "
                 self.reduceTwoLayerCrossings(embedding, i, False, degrees)
 
 
@@ -2970,8 +2974,10 @@ class TermLayout(object):
             #    mySum += embedding[self._link_dict[linkid].source]
             embedding[node.name] = mySum / float(degree + 1.0)
             if debug_layout:
-                print "Setting node", node.name, "embedding to", (mySum / float(degree + 1.0)), \
-                    "from sum", mySum, "and deg", degree
+                #print "Setting node ", node.name, "embedding to", (mySum / float(degree + 1.0)), \
+                        #    "from sum", mySum, "and deg", degree
+                print "Setting node %s embedding to %.5f from sum %.5f and deg %s" % \
+                    (node.name, (mySum / float(degree + 1.0)), mySum, degree)
 
 
     def createFakeDegrees(self):

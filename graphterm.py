@@ -2433,6 +2433,7 @@ class TermLayout(object):
         self._running_neighbors = dict()
         self._links = list()
         self._link_dict = dict()
+        self._modified_links = set()
         self._debug_names = dict()
         self._original_links = list()
         for name in graph._nodes_list:
@@ -2744,6 +2745,8 @@ class TermLayout(object):
         for name in self._nodes_list:
             node = self._nodes[name]
             self.grid[node.rank].append(node)
+            if debug_layout:
+                print "Adding to grid", name, "to row", node.rank, "embedding", (len(self.grid[node.rank]) - 1)
 
         # Ensure each link spans exactly one rank
         if not self.single_source_tree:
@@ -2877,6 +2880,26 @@ class TermLayout(object):
                 processingCoord = self._nodes[nextLink.sink].coord
                 link.segments.append(self.beforeCoord(processingCoord))
 
+
+    def initCross(self, name, visited, embedding, dfsid, indent = " "):
+        if (visited[name]):
+            return
+
+        visited[name] = True
+        embedding[name] = dfsid
+        if debug_layout:
+            print indent, "initCross setting", name, "to", dfsid
+        node = self._nodes[name]
+        for linkid in node._out_links:
+            if linkid not in self._modified_links:
+                sink = self._link_dict[linkid].sink
+                self.initCross(sink, visited, embedding, dfsid + 1, indent + "  ")
+        for linkid in node._out_links:
+            if linkid in self._modified_links:
+                sink = self._link_dict[linkid].sink
+                self.initCross(sink, visited, embedding, dfsid + 1, indent + "  ")
+
+
     def reduceCrossings(self, source, embedding):
         visited = dict()
 
@@ -2911,21 +2934,23 @@ class TermLayout(object):
         self.grid[-1].append(sink)
 
         # Initial heuristic for row order 
-        # I'm not sure this actually does anything so skipping this for now
-        # and instad going with actual order
-        #self.setInitialCrossing(source, visited, embedding, 1)
-        #for row in self.grid:
-        #    sortedRow = sorted(row, lambda x : embedding[x.name])
-        #    for i, node in enumerate(sortedRow):
-        #        embedding[node.name] = i
+        visited = dict()
+        for name in self._nodes:
+            visited[name] = False
+        self.initCross('source', visited, embedding, 1)
+
         degrees = self.createFakeDegrees()
         for a, row in enumerate(self.grid):
             if debug_layout:
                 print "Setting node row", a
+            row = sorted(row, key = lambda x : embedding[x.name])
+            if debug_layout:
+                print [(node.name, embedding[node.name]) for node in row]
             for i, node in enumerate(row):
                 if debug_layout:
                     print "Setting node", node.name, "embedding to", i, "and degree is", degrees[node.name]
                 embedding[node.name] = i
+            self.grid[a] = row
 
         maxRank = len(self.grid) - 1
         for q in range(self.num_sweeps):
@@ -3050,6 +3075,7 @@ class TermLayout(object):
             if delta > 1:
                 self._added[start.name] += 1
                 self._added[end.name] += 1
+                self._modified_links.add(link.id)
                 end._in_links.remove(link.id)
                 atRank = startRank + 1
                 newName = nameBase + '-1' #+ str(atRank)
@@ -3073,7 +3099,7 @@ class TermLayout(object):
                 self._link_dict[newLinkName] = newLink
                 self.grid[atRank].append(newNode)
                 if debug_layout:
-                    print "   Adding node at rank", atRank, "to", start.name, "-->", end.name
+                    print " CREATING", self._debug_names[newLinkName], "at", atRank
 
                 if delta > 2:
                     atRank = endRank - 1
@@ -3102,7 +3128,7 @@ class TermLayout(object):
                     end.add_in_link(secondLink.id)
                     self.grid[startRank + 2].append(secondNode)
                     if debug_layout:
-                        print "   Adding node at rank", (startRank + 2), "to", start.name, "-->", end.name
+                        print " CREATING", self._debug_names[secondLinkName], "at", atRank
                 else:
                     end.add_in_link(newLink.id)
                     self._running_neighbors[end.name].add(newName)

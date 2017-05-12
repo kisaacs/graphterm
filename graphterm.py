@@ -2825,11 +2825,15 @@ class TermLayout(object):
         for name in self._nodes_list:
             node = self._nodes[name]
             if len(node._in_links) > 1:
-                node._in_links = sorted(node._in_links, key = lambda x : embedding[self._link_dict[x].source])
-                half = int(math.floor(len(node._in_links) / 2))
-                node._in_links = [ node._in_links[half] ]
                 if debug_layout:
-                    print "   Keeping", node._in_links[0], self._debug_names[node._in_links[0]]
+                    print "   Pre-sort", [self._debug_names[x] for x in node._in_links]
+                #node._in_links = sorted(node._in_links, key = lambda x : embedding[self._link_dict[x].source])
+                node._in_links.sort(key = lambda x : embedding[self._link_dict[x].source])
+                half = int(math.floor(len(node._in_links) / 2))
+                if debug_layout:
+                    print "   Keeping", self._debug_names[node._in_links[half]], half, \
+                        "of", [self._debug_names[x] for x in node._in_links], len(node._in_links)
+                node._in_links = [ node._in_links[half] ]
             #elif debug_layout and len(node._in_links) == 1:
             #    print "   Keeping", node._in_links[0], self._debug_names[node._in_links[0]]
         for name in self._nodes_list:

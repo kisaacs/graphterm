@@ -261,7 +261,7 @@ class TermDAG(object):
             self.grid_colors.append([self.default_color for x
                 in range(self.gridsize[1])])
         selected = self.node_order[0].name
-        self.select_node(None, selected, self.offset, False)
+        self.select_node(None, selected, self.offset)
 
         for i in range(self.gridsize[0]):
             print self.print_color_row(i, 0, self.gridsize[1] + 1)
@@ -1005,6 +1005,12 @@ class TermDAG(object):
 
 
     def to_ansi_foreground(self, color):
+        """Convert curses color to ANSI color.
+
+           @param color: curses color code to convert
+           @return color code of equivalent ANSI color
+        """
+
         # Note ANSI offset for foreground color is 30 + ANSI lookup.
         # However, we are off by 1 due to curses, hence the minus one.
         if color != 0:
@@ -1012,16 +1018,13 @@ class TermDAG(object):
         return color
 
 
-    def color_string(self, tup):
-        string = '(' + str(tup[0])
-        for val in tup[1:]:
-            string += ',' + str(val)
-        string += ')'
-        return string
 
 
     def resize(self, stdscr):
-        """Handle curses resize event."""
+        """Handle curses resize event.
+
+           @param stdscr: curses window.
+        """
         old_height = self.height
         self.height, self.width = stdscr.getmaxyx()
         self.offset = self.height - self.gridsize[0] - 1
@@ -1057,7 +1060,12 @@ class TermDAG(object):
     def center_xy(self, stdscr, x, y):
         """Center the pad around (x,y). If this moved the pad off the screen,
            shift show screen is as full as possible with pad while still showing
-           (x,y)."""
+           (x,y).
+
+            @param stdscr: curses window
+            @param x: x position to be centered
+            @param y: y position to be centered
+        """
         ideal_corner_x = self.pad_corner_x
         ideal_corner_y = self.pad_corner_y
         move_x = False
@@ -1090,26 +1098,44 @@ class TermDAG(object):
 
 
     def scroll_up(self, amount = 1):
+        """Performs upwards scroll by moving the main pad.
+
+           @param amount: number of rows to be scrolled.
+        """
         if self.pad_corner_y + (self.pad_extent_y - self.pad_pos_y) < self.gridsize[0]:
             self.pad_corner_y += amount
             self.pad_corner_y = min(self.pad_corner_y, self.gridsize[0] + self.pad_pos_y - self.pad_extent_y)
 
     def scroll_down(self, amount = 1):
+        """Performs downwards scroll by moving the main pad.
+
+           @param amount: number of rows to be scrolled.
+        """
         if self.pad_corner_y > 0:
             self.pad_corner_y -= amount
             self.pad_corner_y = max(self.pad_corner_y, 0)
 
     def scroll_left(self, amount = 1):
+        """Performs left scroll by moving the main pad.
+
+           @param amount: number of colums to be scrolled.
+        """
         if self.pad_corner_x + self.width < self.gridsize[1]:
             self.pad_corner_x += amount
             self.pad_corner_x = min(self.pad_corner_x, self.gridsize[1])
 
     def scroll_right(self, amount = 1):
+        """Performs right scroll by moving the main pad.
+
+           @param amount: number of colums to be scrolled.
+        """
         if self.pad_corner_x > 0:
             self.pad_corner_x -= amount
             self.pad_corner_x = max(self.pad_corner_x, 0)
 
     def refresh_pad(self):
+        """Refresh the main pad. Used for redrawing.
+        """
         self.pad.refresh(self.pad_corner_y, self.pad_corner_x,
             self.pad_pos_y, self.pad_pos_x,
             self.pad_extent_y, self.pad_extent_x)
@@ -1118,6 +1144,10 @@ class TermDAG(object):
             self.refresh_qpad()
 
     def toggle_help(self, stdscr):
+        """Change the state of the help menu between collapsed and expanded.
+
+           @param stdscr: curses window.
+        """
         if self.hpad_collapsed:
             self.expand_help()
             self.refresh_hpad()
@@ -1156,7 +1186,14 @@ class TermDAG(object):
 
 
     def make_hpad_string(self, cmd, msg, cmd_length, msg_length):
-        """Convert command pieces into string for help menu."""
+        """Convert command pieces into string for help menu.
+
+           @param cmd: cmd key(s) string
+           @param msg: explanation of command (string)
+           @param cmd_length: horizontal space afforded to commands
+           @param msg_length: horizontal space afforded to explanations
+           @return string centering cmd and msg appropriately given lengths
+        """
         string = ' '
         cmd_padding = cmd_length - len(cmd)
         msg_padding = msg_length - len(msg)
@@ -1189,7 +1226,11 @@ class TermDAG(object):
 
 
     def print_interactive(self, stdscr, has_colors = False):
-        """Setup curses pads and run the main interactive loop."""
+        """Setup curses pads and run the main interactive loop.
+
+           @param stdscr: curses window
+           @param has_colors: True if curses has color support
+        """
         self.pad = curses.newpad(self.gridsize[0] + 1, self.gridsize[1] + 1)
         self.pad_corner_y = 0 # upper left position inside pad
         self.pad_corner_x = 0 # position shown in the pad
@@ -1203,6 +1244,14 @@ class TermDAG(object):
         self.resize(stdscr)
 
         if self.debug:
+            # Check colors
+            def color_string(self, tup):
+                string = '(' + str(tup[0])
+                for val in tup[1:]:
+                    string += ',' + str(val)
+                string += ')'
+                return string
+
             stdscr.move(0, 0)
             self.color_dict = dict()
             for i in range(0, curses.COLORS):
@@ -1210,7 +1259,7 @@ class TermDAG(object):
                 self.color_dict[i + 1] = fg
                 if i % 8 == 0:
                     stdscr.move(i / 8, 0)
-                stdscr.addstr(self.color_string(curses.color_content(fg)),
+                stdscr.addstr(color_string(curses.color_content(fg)),
                     curses.color_pair(i + 1))
 
         # Save state
@@ -1282,6 +1331,7 @@ class TermDAG(object):
                     stdscr.refresh()
                     self.refresh_pad()
 
+                # Move backwards in node selection
                 elif ch == ord('p'):
                     if selected:
                         selected = self.node_order[(-1 + self._nodes[selected].order)
@@ -1294,6 +1344,7 @@ class TermDAG(object):
                     stdscr.move(self.height - 1, 0)
                     stdscr.refresh()
 
+                # Advance node selection
                 elif ch == ord('n'):
                     if selected:
                         selected = self.node_order[(1 + self._nodes[selected].order)
@@ -1310,11 +1361,14 @@ class TermDAG(object):
                 else:
                     ch = curses.ascii.unctrl(ch)
                     if ch[0] == '^' and len(ch) > 1:
+                        # Highlight neighbors of a node (unused)
                         if (ch[1] == 'a' or ch[1] == 'A') and selected:
                             self.highlight_neighbors(stdscr, selected, self.offset)
                             self.refresh_pad()
                             stdscr.move(self.height - 1, 0)
                             stdscr.refresh()
+
+                        # Move backwards in the node order
                         elif (ch[1] == 'b' or ch[1] == 'B'):
                             if selected:
                                 selected = self.node_order[(-1 + self._nodes[selected].order)
@@ -1326,6 +1380,8 @@ class TermDAG(object):
                             self.refresh_pad()
                             stdscr.move(self.height - 1, 0)
                             stdscr.refresh()
+
+                        # Change connectivity highlighting
                         elif (ch[1] == 'v' or ch[1] == 'V'):
                             self.highlight_full_connectivity = not self.highlight_full_connectivity
                             if selected:
@@ -1335,6 +1391,8 @@ class TermDAG(object):
                                 self.refresh_pad()
                                 stdscr.move(self.height - 1, 0)
                                 stdscr.refresh()
+
+                        # Move forwards in the node order for selection
                         elif (ch[1] == 'w' or ch[1] == 'W'):
                             if selected:
                                 selected = self.node_order[(1 + self._nodes[selected].order)
@@ -1377,14 +1435,12 @@ class TermDAG(object):
                     stdscr.refresh()
 
 
-    # TODO: Replace doPad with None check on stdscr
-    def select_node(self, stdscr, name, offset, doPad = True):
+    def select_node(self, stdscr, name, offset):
         """Highlight the give node.
 
            @param stdscr: curses screen object. Use None for print-only
            @param name: name of node to be selected
            @param offset: unused
-           @param doPad: If False, skips the curses related computation -- for print-only
         """
         # Clear existing highlights
         if stdscr:
@@ -1394,30 +1450,30 @@ class TermDAG(object):
             self.highlight_node(stdscr, name, offset, self.select_color + self.maxcolor) # Cyan
             self.highlight_neighbors(stdscr, name, offset)
 
-            node = self._nodes[name]
-            self.center_xy(stdscr, self.left_offset + node._col, node._row)
+            if stdscr:
+                node = self._nodes[name]
+                self.center_xy(stdscr, self.left_offset + node._col, node._row)
             return name
 
         return ''
 
 
-    def highlight_neighbors(self, stdscr, name, offset, doPad = True):
+    def highlight_neighbors(self, stdscr, name, offset):
         """Highlights node neighbors. We assume that the node in question is
            already highlighted.
 
            @param stdscr: curses screen object. Use None for print-only
            @param name: name of node to be selected
            @param offset: unused
-           @param doPad: If False, skips the curses related computation -- for print-only
         """
 
         node = self._nodes[name]
 
-        self.highlight_in_neighbors(stdscr, name, offset, self.highlight_full_connectivity, doPad)
-        self.highlight_out_neighbors(stdscr, name, offset, self.highlight_full_connectivity, doPad)
+        self.highlight_in_neighbors(stdscr, name, offset, self.highlight_full_connectivity)
+        self.highlight_out_neighbors(stdscr, name, offset, self.highlight_full_connectivity)
 
 
-    def highlight_in_neighbors(self, stdscr, name, offset, recurse, doPad = True):
+    def highlight_in_neighbors(self, stdscr, name, offset, recurse):
         """Highlights node in-neighbors. We assume that the node in question is
            already highlighted.
 
@@ -1425,7 +1481,6 @@ class TermDAG(object):
            @param name: name of neighbor node to be highlit
            @param offset: unused
            @param recurse: if True, highlights neighbors of neighbors recursively
-           @param doPad: If False, skips the curses related computation -- for print-only
         """
         node = self._nodes[name]
 
@@ -1435,10 +1490,10 @@ class TermDAG(object):
             self.highlight_segments(stdscr, link.segments, offset)
 
             if recurse:
-                self.highlight_in_neighbors(stdscr, link.source, offset, recurse, doPad)
+                self.highlight_in_neighbors(stdscr, link.source, offset, recurse)
 
 
-    def highlight_out_neighbors(self, stdscr, name, offset, recurse, doPad = True):
+    def highlight_out_neighbors(self, stdscr, name, offset, recurse):
         """Highlights node out-neighbors. We assume that the node in question is
            already highlighted.
 
@@ -1446,7 +1501,6 @@ class TermDAG(object):
            @param name: name of neighbor node to be highlit
            @param offset: unused
            @param recurse: if True, highlights neighbors of neighbors recursively
-           @param doPad: If False, skips the curses related computation -- for print-only
         """
         node = self._nodes[name]
 
@@ -1456,18 +1510,17 @@ class TermDAG(object):
             self.highlight_segments(stdscr, link.segments, offset)
 
             if recurse:
-                self.highlight_out_neighbors(stdscr, link.sink, offset, recurse, doPad)
+                self.highlight_out_neighbors(stdscr, link.sink, offset, recurse)
 
 
-    def highlight_segments(self, stdscr, segments, offset, doPad = True):
+    def highlight_segments(self, stdscr, segments, offset):
         """Highlights given segments.
 
            @param stdscr: curses screen object. Use None for print-only
            @param segments: list of segments to be highlit
            @param offset: unused
-           @param doPad: If False, skips the curses related computation -- for print-only
         """
-        if not doPad:
+        if not stdscr:
             self.highlight_segments_printonly(segments, offset)
             return
         for segment in segments:
@@ -1526,18 +1579,17 @@ class TermDAG(object):
                         self.grid[y][x] = 'X'
 
 
-    def highlight_node(self, stdscr, name, offset, color, doPad = True):
+    def highlight_node(self, stdscr, name, offset, color):
         """Highlights given node to the given color.
 
            @param stdscr: curses window
            @param name: name of node to be highlit
            @param offset: unused
            @param color: curses color pair ID for color to be used
-           @param doPad: TODO FIX ME
         """
         if name not in self._nodes:
             return ''
-        if not doPad:
+        if not stdscr:
             self.highlight_node_printonly(name, offset, color)
             return
 
@@ -1640,6 +1692,10 @@ class TermDAG(object):
 
 
     def top_endpoint(self, segment):
+        """Handle top endpoint condition in Bentley-Ottman.
+
+           @param segment: current segment
+        """
         self.bst.insert(segment)
 
         #if self.debug:
@@ -1673,6 +1729,10 @@ class TermDAG(object):
 
 
     def bottom_endpoint(self, segment):
+        """Handle bottom endpoint case in Bentley-Ottman.
+
+           @param segment: current segment
+        """
         #if self.debug:
         #    print "     Bottom Check", segment
         #    self.bst.print_tree()
@@ -1696,6 +1756,13 @@ class TermDAG(object):
 
 
     def crossing(self, c1, c2, segment1, segment2):
+        """Handle crossing case in Bentley-Ottman.
+
+           @param c1:
+           @param c2:
+           @param segment1:
+           @param segment2:
+        """
         #if self.debug:
         #    print "     Crossing check", c1, c2, segment1, segment2
         #    self.bst.print_tree()
@@ -1772,9 +1839,19 @@ class TermBST(object):
         self.root = None
 
     def insert(self, segment):
+        """Insert segment into the BST.
+
+           @param segment: segment to be inserted
+        """
         self.root = self.insert_helper(self.root, segment)
 
     def insert_helper(self, root, segment):
+        """Helper function for segment insert.
+
+           @param root: subtree root to insert segment into
+           @param segment: segment to be inserted
+           @return root of the changed subtree
+        """
         if root is None:
             root = TermBSTNode(segment)
             segment.BSTNode = root
@@ -1788,6 +1865,13 @@ class TermBST(object):
 
 
     def swap(self, segment1, segment2, b1, b2):
+        """Swap two segments in the BST.
+
+           @param segment1: first segment to be swapped
+           @param segment2: second segment to be swapped
+           @param b1: crossing order value 1
+           @param b2: crossing order value 2
+        """
         node1 = segment1.BSTNode
         node2 = segment2.BSTNode
         node1.segment = segment2
@@ -1798,10 +1882,20 @@ class TermBST(object):
         segment2.b2 = b2
 
     def find(self, segment):
+        """Find segment node in BST.
+
+           @param segment: segment to be found.
+        """
         return self.find_helper(self.root, segment)
 
 
     def find_helper(self, root, segment):
+        """Helper function for recursive segment finding.
+
+           @param root: root of subtree to search
+           @param segment: segment to be found.
+           @return found node
+        """
         if root is None or root.segment == segment:
             return root
         elif root.segment > segment:
@@ -1811,6 +1905,12 @@ class TermBST(object):
 
 
     def find_previous(self, segment, debug = False):
+        """Find the previous node to the given segment.
+
+           @param segment: segment whose previous node is to be found.
+           @param debug: True if debug information should be printed.
+           @return predecessor node
+        """
         node = segment.BSTNode
         #if node is None and debug:
         #    print "ERROR, could not find", segment, " in find_previous"
@@ -1836,6 +1936,12 @@ class TermBST(object):
 
 
     def find_next(self, segment, debug = False):
+        """Find the next node to the given segment in BST order.
+
+           @param segment: segment whose next node is to be found.
+           @param debug: True if debug information should be printed.
+           @return successor node
+        """
         node = segment.BSTNode
         #if node is None and debug:
         #    print "ERROR, could not find", segment, " in find_next"
@@ -1861,6 +1967,11 @@ class TermBST(object):
 
 
     def delete(self, segment, debug = False):
+        """Delete a segment from the BST.
+
+           @param segment: segment to be deleted
+           @param debug: True if debug information should be printed.
+        """
         #node = self.find(segment)
         node = segment.BSTNode
         segment.BSTNode = None
@@ -1907,12 +2018,18 @@ class TermBST(object):
             replacement.parent = node.parent
 
     def print_tree(self):
+        """Print the BST."""
         print '--- Tree ---'
         if self.root:
             self.print_tree_helper(self.root, '')
         print '------------'
 
     def print_tree_helper(self, root, indent):
+        """Print a BST subtree for debugging.
+
+           @param root: root of subtree to print
+           @param indent: current indent level
+        """
         if root.left:
             self.print_tree_helper(root.left, indent + '   ')
         print indent, root.segment
@@ -1920,11 +2037,21 @@ class TermBST(object):
             self.print_tree_helper(root.right, indent + '   ')
 
     def tree_to_list(self):
+        """Flattens BST to in-order list.
+
+           @return nodes in list format.
+        """
         lst = []
         lst = self.tree_to_list_helper(self.root, lst)
         return lst
 
     def tree_to_list_helper(self, root, lst):
+        """Helper in creating BST in-order list.
+
+           @param root: root of subtree to be flattened
+           @param lst: list to add flattened subtree to
+           @return partial flattened list
+        """
         if root.left:
             lst = self.tree_to_list_helper(root.left, lst)
         lst.append(root.segment)

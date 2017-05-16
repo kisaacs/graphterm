@@ -2109,11 +2109,21 @@ class TermSegment(object):
 
 
     def addCrossing(self, other, point):
+        """Update crossing information on this link.
+
+           @param other: link which crosses us
+           @param point: crossing point of other link
+        """
         self.crossing_count += 1
         if other.vertical:
             self.vertical_crossing_count += 1
 
+
     def for_segment_sort(self):
+        """Metric for sorting segments.
+
+           @return metric value for use in sorting
+        """
         xlen = abs(self.x1 - self.x2)
         ylen = abs(self.y1 - self.y2)
 
@@ -2126,15 +2136,22 @@ class TermSegment(object):
         seg += xlen + ylen
         return seg
 
+
     def split(self, node, bundle = False, debug = False):
         """Split this segment into two at node. Return the next segment.
 
            Note the new segment is always the second part (closer to the sink).
+
+           @param node: end point of two new segments
+           @param bundle: True if this is part of a bundled edge
+           @param debug: True if debug information should be included
         """
 
-        # The one we are splitting from -- may have been updated by a previous split
+        # The one we are splitting from may have been updated by a previous split
         # Note that now that we can define horizontal paths, we can't rely on 
         # the y value to totally define. 
+        # Therefore, we must find the correct part of this multi-split link to
+        # split from, one that contains the node
         splitter = self
         if bundle:
             if debug:
@@ -2174,7 +2191,7 @@ class TermSegment(object):
         splitter.x2 = node._x
         splitter.y2 = node._y
         for link in self.origin.links:
-            # Why had this never been triggered before since it should have
+            # Why had this never beenV triggered before since it should have
             # failed
             link.segments.append(other)
 
@@ -2188,16 +2205,36 @@ class TermSegment(object):
     # The x1, y1 are always the least negative y and therefore
     # in the sorting order they act as the  bottom
     def is_bottom_endpoint(self, x, y):
+        """Check if (x,y) is the bottom end point of the segment.
+
+           @param x: x to check
+           @param y: y to check
+           @return True if the end point matches
+        """
         if abs(x - self.x1) < 1e-6 and abs(y - self.y1) < 1e-6:
             return True
         return False
 
     def is_top_endpoint(self, x, y):
+        """Check if (x,y) is the top end point of the segment.
+
+           @param x: x to check
+           @param y: y to check
+           @return True if the end point matches
+        """
         if abs(x - self.x2) < 1e-6 and abs(y - self.y2) < 1e-6:
             return True
         return False
 
     def intersect(self, other, debug = False):
+        """Check for intersection with another segment.
+
+           @param other: segment we may intersect with
+           @param debug: True if debug information should be print
+           @return a tuple where the first value indicates whether
+                   there was an intersection and the next two values
+                   indicate the intersecting point if there was one.
+        """
         if other is None:
             return (False, 0, 0)
 
@@ -2232,10 +2269,24 @@ class TermSegment(object):
                 return (True, xi, yi)
             return (False, 0, 0)
 
+
     def cross2D(self, p1, p2):
+        """Return 2D cross product of two points.
+
+           @param p1: point 1 as (x, y)
+           @param p2: point 2 as (x, y)
+           @return cross product of p1 and p2
+        """
         return p1[0] * p2[1] - p1[1] * p2[0]
 
+
     def __eq__(self, other):
+        """Check if segments are equal. They are equal if they have the
+           same end points.
+
+           @param other: other segment to check.
+           @return True if equal, False otherwise
+        """
         if other is None:
             return False
         return (self.x1 == other.x1
@@ -2246,6 +2297,11 @@ class TermSegment(object):
     # For the line-sweep algorithm, we have some consistent ordering
     # as we will have a lot of collisions on just y alone.
     def __lt__(self, other):
+        """Less than comparison operator. This one compares the b values first.
+
+           @param other: segment to be compared for sorting
+           @return True if this segment is less than the other
+        """
         if self.b1 == other.b1:
             if self.x1 == other.x1:
                 if self.b2 == other.b2:
@@ -2261,6 +2317,13 @@ class TermSegment(object):
         return False
 
     def traditional_sort(self, other):
+        """Comparison operator for traditional sort. Only compares end point
+           values. Compares y value first, then x, starting with the first point
+           and continuing onto the second if necessary.
+
+           @param other: segment to be compared for sorting
+           @return True if this segment is less than the other
+        """
         if self.y1 == other.y1:
             if self.x1 == other.x1:
                 if self.y2 == other.y2:
@@ -2276,10 +2339,18 @@ class TermSegment(object):
         return False
 
     def __str__(self):
+        """String representation of a segment.
+
+           @return string representation
+        """
         return "%s - TermSegment(%s, %s, %s, %s) " % (self.name, self.x1, self.y1,
             self.x2, self.y2) + str(self.paths)
 
     def __hash__(self):
+        """Hash of a segment.
+
+           @return hash of a segment.
+        """
         return hash(self.__repr__())
 
 
@@ -2305,6 +2376,7 @@ class TermNode(object):
         self.crossing_heights = dict() # y -> where the crossing should occur
 
     def reset(self):
+        """Reset layout values to prepare for re-doing layout."""
         self.rank = -1 # Int
         self._x = -1  # Real
         self._y = -1  # Real
@@ -2318,12 +2390,24 @@ class TermNode(object):
         self.crossing_heights = dict() # y -> where the crossing should occur
 
     def add_in_link(self, link):
+        """Add in-link for bookkeeping.
+
+           @param link: TermLink with sink at this node.
+        """
         self._in_links.append(link)
 
     def add_out_link(self, link):
+        """Add out-link for bookkeeping.
+
+           @param link: TermLink with source at this node.
+        """
         self._out_links.append(link)
 
     def add_in_segment(self, segment):
+        """Add in-segment for bookkeeping.
+
+           @param segment: TermSegment with sink at this node.
+        """
         if segment.y1 == segment.y2:
             self.vertical_in = segment
         self._in_segments.append(segment)

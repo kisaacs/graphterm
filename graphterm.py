@@ -4,11 +4,22 @@ import curses
 import curses.ascii
 import math
 
+# Print debug information for the initial graph layout
 debug_layout = False
 
 class TermDAG(object):
+    """Class to store DAG layout and manage interactions.
+
+       This class stores its own copy of the graph.
+    """
 
     def __init__(self, logfile = None, question = None):
+        """Constructor. Nodes and links should be added after construction
+           using the add_node and add_link methods.
+
+           @param logifle: filename/path to store interaction log
+           @param question: question text that should be displayed above graph
+        """
         # Display question, keep logs for studies
         self.logfile = logfile
         if logfile:
@@ -26,20 +37,20 @@ class TermDAG(object):
         self.grid_colors = []
         self.row_max = 0
         self.row_names = dict()
+        self.left_offset = 0
+        self.right_offset = 0
 
         self.TL = None
         self.placers = set()
+
+        # Interactive behavior
+        self.highlight_full_connectivity = False
 
         # Debug flags
         self.layout = False
         self.debug = False
         self.is_interactive = True
         self.name = 'default'
-
-        self.left_offset = 0
-        self.right_offset = 0
-
-        self.highlight_full_connectivity = False
 
         # Pad containing layout
         self.pad = None
@@ -53,6 +64,7 @@ class TermDAG(object):
         self.width = 0
         self.offset = 0
 
+        # Color defaults
         self.maxcolor = 7
         self.default_color = 0 # whatever is the true default
         self.select_color = 2 # red
@@ -66,7 +78,10 @@ class TermDAG(object):
 
 
     def reset(self):
-        """Resets the layout data structures for multi-layout comparison."""
+        """Resets the layout data structures for re-running the layout.
+
+           This can be used in multi-layout comparison.
+        """
         self._positions_set = False
         self.gridsize = [0,0]
         self.gridedge = [] # the last char per row
@@ -78,6 +93,7 @@ class TermDAG(object):
         self.left_offset = 0
         self.right_offset = 0
 
+        # Delete extra layout nodes
         toDelete = list()
         for node in self._nodes.values():
             if not node.real:
@@ -124,7 +140,10 @@ class TermDAG(object):
 
 
     def log_character(self, ch):
-        """Write a character to the interaction log."""
+        """Write a character to the interaction log.
+
+           @param ch: character to write
+        """
         if isinstance(ch, unicode):
             self.logfile.write(str(ch).decode('utf-8').encode('utf-8'))
         elif isinstance(ch, int) and ch < 128:
@@ -199,7 +218,10 @@ class TermDAG(object):
 
 
     def add_node(self, name):
-        """Add a node to the internal graph."""
+        """Add a node to the internal graph.
+
+           @param name: name of node to add.
+        """
         if len(self._nodes.keys()) == 0:
             self.name = name
         node = TermNode(name)
@@ -209,7 +231,11 @@ class TermDAG(object):
 
 
     def add_link(self, source, sink):
-        """Add a link to the internal graph."""
+        """Add a link to the internal graph.
+
+           @param source: name of source node to add
+           @param sink: name of sink node to add
+        """
         link = TermLink(len(self._links), source, sink)
         self._links.append(link)
         self._nodes[source].add_out_link(link)
@@ -248,20 +274,26 @@ class TermDAG(object):
 
     def layout_hierarchical(self):
         """Layout the graph into an ASCII Grid."""
+
+        # Run graphical space layout
         self.TL = TermLayout(self)
         self.TL.layout()
 
-        xset = set()
-        yset = set()
-        node_yset = set()
-        segments = set()
+        # Data structures
+        xset = set() # set of seen x coords
+        yset = set() # set of seen y coords
+        node_yset = set() # set of y coords pertaining to nodes
+        segments = set() # set of seen segments
         segment_lookup = dict()
         self.segment_ids = dict()
-        coord_to_node = dict()
-        coord_to_placer = dict()
+        coord_to_node = dict() # lookup a node from its coord
+        coord_to_placer = dict() # lookup a placer node from its coord
 
-        # Convert Tulip layout to something we can manipulate for both nodes
-        # and links.
+        # Convert graphical layout to something we can manipulate for 
+        # both nodes and links.
+
+        # Find set of all node coordinates from graphical layout.
+        # Also keep track of coordinate extents
         maxy = -1e9
         self.min_tulip_x = 1e9
         self.max_tulip_x = -1e9
@@ -281,6 +313,12 @@ class TermDAG(object):
             self.max_tulip_x = max(self.max_tulip_x, coord[0])
             self.min_tulip_x = min(self.min_tulip_x, coord[0])
 
+        # Convert segments calculated in graphical layout to internal segments
+        # and update or seen x and y coords.
+        # Create placer nodes as necessary between segments.
+        # TODO: Make better use of TL which has already done some of this
+        # work.
+        # TODO: Factor some of the repeat code.
         segmentID = 0
         for link in self._links:
             link._coords = self.TL._link_dict[link.id].segments
@@ -338,18 +376,22 @@ class TermDAG(object):
             segment.end = self._nodes[link.sink]
             segment.original_end = self._nodes[link.sink]
 
+
         if self.debug:
-            self.write_tulip_positions();
+            self.write_graphical_positions();
             print "xset", sorted(list(xset))
             print "yset", sorted(list(yset))
 
-        # Find crossings and create new segments based on them
+
+        # Find crossings between segments in graphical layout.
         self.find_crossings(segments)
         if self.debug:
             print "CROSSINGS ARE: "
             #return
 
-        # Consolidate crossing points
+        # Consolidate crossing points so that fewer segment crossings will
+        # have to be dealt with. This keeps track of the x and y values of
+        # the crossings.
         crossings_points = dict() # (x, y) -> set of segments
         for k, v in self.crossings.items(): # crossings is (seg1, seg2) -> (x, y)
             if v not in crossings_points:
@@ -359,14 +401,16 @@ class TermDAG(object):
             self.segment_ids[k[0]].addCrossing(self.segment_ids[k[1]], v)
             self.segment_ids[k[1]].addCrossing(self.segment_ids[k[0]], v)
 
+        # Based on the set of all crossings coming into a placer node,
+        # calculate appropriate crossing heights.
         for placer in self.placers:
             placer.findCrossingHeights(self.min_tulip_x, self.max_tulip_x, self.debug)
 
         # For each crossing, figure out if the end point of either already has
         # a set of height for that y value. Cases:
-        # Neither has one: proceed as normal
-        # One has one: shift the crossing to that y value
-        # More than one has them: Ignore for now
+        #     Neither has one: proceed as normal
+        #     One has one: shift the crossing to that y value
+        #     More than one has them: Ignore for now
         for v, k in crossings_points.items():
             x, y = v
             if self.debug:
@@ -376,26 +420,23 @@ class TermDAG(object):
                 print "Testing point", v
             for name in k:
                 segment = self.segment_ids[name]
-                #print 'Testing point', v, 'for segment', segment, 'with height', segment.end.crossing_heights
-                #print '  Is', segment.y1, 'there?'
                 if self.debug:
-                    print '   segment', segment.name, 'at end', segment.origin.original_end._x, segment.origin.original_end._y
+                    print '   segment', segment.name, 'at end', \
+                        segment.origin.original_end._x, segment.origin.original_end._y
                 if segment.y1 in segment.origin.original_end.crossing_heights:
                     if self.debug:
-                        print '       found at height', segment.origin.original_end.crossing_heights[segment.y1]
+                        print '       found at height', \
+                            segment.origin.original_end.crossing_heights[segment.y1]
                     special_heights.append(segment.origin.original_end.crossing_heights[segment.y1])
 
+
+            # Determine where to bundle depending on special heights.
             placer_y = y
             bundle = False
-            #print "Length of spcil heights is", len(special_heights)
             if len(special_heights) == 1:
-                #print 'setting placer y to', special_heights[0]
                 placer_y = special_heights[0]
                 bundle = True
             elif len(special_heights) > 1:
-                #print "Special heights are", special_heights
-                #for name in k:
-                #    print " ---", self.segment_ids[name]
                 continue
 
             # Get placer
@@ -421,11 +462,13 @@ class TermDAG(object):
             xset.add(x)
             yset.add(placer_y)
 
-        # Based on the tulip layout, do the following:
+
+        # Convert found x and y coords in graphical layout to positions in
+        # the ASCII grid.
         xsort = sorted(list(xset))
         ysort = sorted(list(yset))
         ysort.reverse()
-        segment_pos = dict()
+        segment_pos = dict() # Lookup of graphical y position to ASCII y position
         column_multiplier = 2
         row_multiplier = 2
         self.gridsize = [len(ysort) - len(node_yset) + len(node_yset) * row_multiplier,
@@ -440,6 +483,7 @@ class TermDAG(object):
         if self.debug:
             print self.gridsize
 
+        # Setup lookups from x-coord to col and y-coord to row
         row_lookup = dict()
         col_lookup = dict()
         row_nodes = dict()
@@ -472,7 +516,7 @@ class TermDAG(object):
         for row, nodes in row_nodes.items():
             row_nodes[row] = sorted(nodes, key = lambda node: node._col)
 
-        # Find the node order:
+        # Find the node order per row.
         self.node_order = sorted(self._nodes.values(),
             key = lambda node: node._row * 1e6 + node._col)
         for i, node in enumerate(self.node_order):
@@ -496,12 +540,14 @@ class TermDAG(object):
                     self.print_grid()
 
 
-        # Sort segments on drawing difficulty -- this is useful for 
-        # debugging collisions. It will eventually be used to help
-        # re-route collisions.
+        # Sort segments on drawing difficulty. This is used in the collision
+        # policy to determine which character to draw.
         segments = sorted(segments, key = lambda x: x.for_segment_sort())
 
-        # Add segments to the grid
+        # Add segments to the grid. Status meaning:
+        #     passed: Drawn with only |, /, \, _
+        #     failed: Failed to draw for some reason
+        #     drawing: Drawing uses X
         status = 'passed'
         for segment in segments:
             segment.gridlist =  self.draw_line(segment)
@@ -509,6 +555,7 @@ class TermDAG(object):
             if not err:
                 status = 'drawing'
 
+        # Determine max grid size with labels and reset grid.
         self.grid = []
         self.gridedge = []
         self.grid_colors = []
@@ -557,7 +604,8 @@ class TermDAG(object):
     def place_label_left(self, node):
         """Attempt to place a label to the left of the node on the grid.
 
-           Returns True if successful, False if there is a collision.
+           @param node: node with label to place.
+           @return True if successful, False if there is a collision.
         """
         y = node._row
         x = self.left_offset + node._col - 2 # start one space before node
@@ -580,7 +628,8 @@ class TermDAG(object):
     def place_label_right(self, node):
         """Attempt to place a label to the right of the node on the grid.
 
-           Returns True if successful, False if there is a collision.
+           @param: node: node with label to place.
+           @return True if successful, False if there is a collision.
         """
         y = node._row
         x = self.left_offset + node._col + 2 # start one space after node
@@ -650,7 +699,10 @@ class TermDAG(object):
 
 
     def place_labels(self, row_nodes):
-        """Places labels for all nodes in a grid row."""
+        """Places labels for all nodes in a grid row.
+
+           @param row_nodes: mapping from row to list of nodes on that row
+        """
         if self.debug:
             print 'gridsize is', self.gridsize
             print 'offsets are', self.left_offset, self.right_offset
@@ -745,7 +797,10 @@ class TermDAG(object):
 
     def calculate_max_labels(self, row_nodes):
         """Calculates the maximum amount of space needed to place labels
-           for a row of nodes."""
+           for a row of nodes.
+
+           @param row_nodes: mapping from row to list of nodes on that row
+        """
         self.row_max = 0
 
         # For use in two-pracket case
@@ -778,7 +833,10 @@ class TermDAG(object):
 
     def set_to_grid(self, segment): #, row_last):
         """Converts calculated link segments into positions on the grid.
-           Implements rules for character collisions."""
+           Implements rules for character collisions.
+
+           @param segment: segment to be drawn on ASCII grid.
+        """
         success = True
         start = segment.start
         end = segment.end
@@ -835,7 +893,10 @@ class TermDAG(object):
 
 
     def draw_line(self, segment):
-        """Determine grid positions for a line segment."""
+        """Determine grid positions for a line segment.
+
+           @param segment: segment to be converted to grid positions.
+        """
         x1 = segment.start._col
         y1 = segment.start._row
         x2 = segment.end._col
@@ -893,7 +954,11 @@ class TermDAG(object):
 
 
     def print_grid(self, with_colors = False):
-        """Print grid to stdout."""
+        """Print grid to stdout.
+
+           @param with_colors: True if ANSI colors should be used. Otherwise
+                               prints whatever terminal default is.
+        """
         if not self.layout and not self.debug:
             self.layout_hierarchical()
 
@@ -913,7 +978,12 @@ class TermDAG(object):
 
 
     def print_color_row(self, i, start, end):
-        """Print a single text row using ANSI color escape codes."""
+        """Print a single text row using ANSI color escape codes.
+
+           @param i: row to print
+           @param start: start column in row to print in color
+           @param end: end column in row to print in color
+        """
         text = self.grid[i]
         colors = self.grid_colors[i]
 
@@ -1518,17 +1588,13 @@ class TermDAG(object):
                 else:
                     continue
 
-    def write_tulip_positions(self):
-        """Writes out the Tulip positions for debugging."""
+    def write_graphical_positions(self):
+        """Writes out the graphical positions for debugging."""
         for node in self._nodes.values():
             print node.name, node._x, node._y
-            if self.TL and self.TL.is_valid():
-                print "TL: ", self.TL.get_node_coord(node.name)
 
         for link in self._links:
             print link.source, link.sink, link._coords
-            if self.TL and self.TL.is_valid():
-                print "TL: ", self.TL.get_link_segments(link.id)
 
 
     def print_pqueue(self):
@@ -3081,4 +3147,4 @@ def interactive_helper(stdscr, graph):
         curses.init_pair(i + 1, i, -1)
         curses.init_pair(i + 1 + curses.COLORS, 7, i)
     graph.print_interactive(stdscr, can_color)
-    graph.write_tulip_positions()
+    graph.write_graphical_positions()

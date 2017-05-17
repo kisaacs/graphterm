@@ -2183,10 +2183,6 @@ class TermSegment(object):
                         if debug:
                             print "Splitting on child (y):", child
 
-        #print "Breakpoint is", node._x, node._y
-        #print "Self is", self
-        #print "Splitter is", splitter
-
         other = TermSegment(node._x, node._y, splitter.x2, splitter.y2)
         other.start = node
         other.end = splitter.end
@@ -2196,14 +2192,12 @@ class TermSegment(object):
         splitter.x2 = node._x
         splitter.y2 = node._y
         for link in self.origin.links:
-            # Why had this never beenV triggered before since it should have
+            # Why had this never been triggered before since it should have
             # failed
             link.segments.append(other)
 
         other.origin = self.origin
         self.origin.children.append(other)
-
-        #print "Other is", other
 
         return other
 
@@ -2251,9 +2245,9 @@ class TermSegment(object):
         initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1),
             self.pdiff)
 
-        #if debug:
-        #    print " - Intersecting", self, other, self.pdiff, other.pdiff, \
-        #        diffcross, other.x1, self.x1, other.y1, self.y1, initcross
+        if debug:
+            print " - Intersecting", self, other, self.pdiff, other.pdiff, \
+                diffcross, other.x1, self.x1, other.y1, self.y1, initcross
 
         if diffcross == 0 and initcross == 0: # Co-linear
             # Impossible for our purposes -- we do not count intersection at
@@ -2266,14 +2260,14 @@ class TermSegment(object):
         else: # intersection!
             offset = initcross / diffcross
             offset2 = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), other.pdiff) / diffcross
-            #if debug:
-            #    print " - offsets are", offset, offset2
+            if debug:
+                print " - offsets are", offset, offset2
 
             if offset > 0 and offset < 1 and offset2 > 0 and offset2 < 1:
                 xi = other.x1 + offset * other.pdiff[0]
                 yi = other.y1 + offset * other.pdiff[1]
-                #if debug:
-                #    print " - points are:", xi, yi
+                if debug:
+                    print " - points are:", xi, yi
                 return (True, xi, yi)
             return (False, 0, 0)
 
@@ -2722,11 +2716,10 @@ class TermLayout(object):
 
             if debug_layout:
                 print indent, node.name, 'Checking mergeLR for link', self._debug_names[linkid]
-            foo = self.mergeLR(leftTree, rightTree, decal, indent + "  ")
+            merged = self.mergeLR(leftTree, rightTree, decal, indent + "  ")
             if debug_layout:
                 print indent, node.name, "post-mergeLR", foo, leftTree
-            if foo == leftTree:
-            #if self.mergeLR(leftTree, rightTree, decal) == leftTree:
+            if merged == leftTree:
                 if debug_layout:
                     print indent, node.name, 'appending equal'
                 childPos.append(tempLeft + decal)
@@ -2785,24 +2778,20 @@ class TermLayout(object):
                         left.insert(itL, tmp)
                         itL += 1  #Increment after insert
                         left[itL] = (left[itL][L], left[itL][R], left[itL][size] - minSize)
-                        #left[itL][size] -= minSize
                         iL = -1 * minSize
                 else:
                     if iL + minSize >= left[itL][size]: # end
                         left[itL] = (left[itL][L], left[itL][R], left[itL][size] - minSize)
-                        #left[itL][size] -= minSize
                         itL += 1
                         left.insert(itL, tmp)
                         itL += 1  #Increment after insert
                         iL = -1 * minSize
                     else: # middle
                         tmp2 = left[itL]
-                        #left[itL][size] = iL
                         left[itL] = (left[itL][L], left[itL][R], iL)
                         itL += 1
                         left.insert(itL, tmp)
                         itL += 1  #Increment after insert
-                        #tmp2[size] -= iL + minSize
                         tmp2 = (tmp2[L], tmp2[R], tmp2[size] - (iL + minSize))
                         left.insert(itL, tmp2)
                         itL += 1  #Increment after insert
@@ -2906,7 +2895,8 @@ class TermLayout(object):
             node = self._nodes[name]
             self.grid[node.rank].append(node)
             if debug_layout:
-                print "Adding to grid", name, "to row", node.rank, "embedding", (len(self.grid[node.rank]) - 1)
+                print "Adding to grid", name, "to row", node.rank, \
+                    "embedding", (len(self.grid[node.rank]) - 1)
 
         # Ensure each link spans exactly one rank
         if not self.single_source_tree:
@@ -2925,8 +2915,8 @@ class TermLayout(object):
                 print "Reducing crossings..."
             self.reduceCrossings(source_node, embedding)
 
-            #if debug_layout:
-            #    print "Crossings reduced, creating spanning tree..."
+            if debug_layout:
+                print "Crossings reduced, creating spanning tree..."
             self.createSpanningTree(embedding)
 
         if debug_layout:
@@ -2935,22 +2925,22 @@ class TermLayout(object):
         rankSizes = []
         for row in self.grid:
             rankSizes.append(len(row))
-        #if debug_layout:
-        #    print "RTE time... "
+        if debug_layout:
+            print "RTE time... "
         self.RTE(source_node, rankSizes) #self.grid)
-        #if debug_layout:
-        #    print "RTE clear."
+        if debug_layout:
+            print "RTE clear."
 
         # Do Edge Bends
-        #if debug_layout:
-        #    print "Computing edge bends..."
+        if debug_layout:
+            print "Computing edge bends..."
         self.computeEdgeBends()
-        #if debug_layout:
-        #    print "Bends computed..."
+        if debug_layout:
+            print "Bends computed..."
 
-        #if debug_layout:
-        #    self.printNodeCoords()
-        #    self.printEdgeCoords()
+        if debug_layout:
+            self.printNodeCoords()
+            self.printEdgeCoords()
 
         self.valid = True
 

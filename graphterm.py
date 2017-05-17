@@ -2850,7 +2850,13 @@ class TermLayout(object):
             return
 
         # Ensure single source
-        source_node = self.create_single_source()
+        if self.single_source_tree:
+            for node in self._nodes.values():
+                if not node._in_links:
+                    source_node = node
+                    break
+        else:
+            source_node = self.create_single_source()
 
         # Set Ranks
         maxRank = self.setRanks(source_node)
@@ -3069,7 +3075,7 @@ class TermLayout(object):
         visited = dict()
         for name in self._nodes:
             visited[name] = False
-        self.initCross('source', visited, embedding, 1)
+        self.initCross(source.name, visited, embedding, 1)
 
         # Get node degrees based on original data plus added link
         # to match original Tulip algorithm
@@ -3125,25 +3131,36 @@ class TermLayout(object):
 
 
     def reduceTwoLayerCrossings(self, embedding, layer, isUp, degrees):
-        # In Auber this appears to just compute based on both fixed layers at
-        # the same time. I have left it the same.
+        """Modify the embedding of each node in a row based on its neighbor
+           embedding values.
+
+           @param embedding: dictionary of node embedding values
+           @param layer: the row to re-calculate
+           @param isUp: True if layer should be modified based on its below
+                        neighbor row. NOTE: This is not used, instead this
+                        function calculates based on both neighbor rows.
+                        This is the way it is implemented in Tulip 4.9.0
+                        so I have left it the same.
+           @param degrees: dictionary keeping track of degrees of each node
+        """
         row = self.grid[layer]
         for node in row:
             mySum = embedding[node.name]
-            #degree = len(node._out_links) + len(node._in_links)
             degree = degrees[node.name] + self._added[node.name]
+
+            # Add the embeddinmg value of all running neighbors, both
+            # original and added
             for name in self._running_neighbors[node.name]:
                 mySum += embedding[name]
-            if node.name == 'sink': # Account for sink between twice its neighbor in tulip
+
+            # Account for sink between twice its neighbor in tulip
+            # It must be added twice
+            if node.name == 'sink':
                 mySum += embedding['sink']
-            #for linkid in node._out_links:
-            #    mySum += embedding[self._link_dict[linkid].sink]
-            #for linkid in node._in_links:
-            #    mySum += embedding[self._link_dict[linkid].source]
+
             embedding[node.name] = mySum / float(degree + 1.0)
+
             if debug_layout:
-                #print "Setting node ", node.name, "embedding to", (mySum / float(degree + 1.0)), \
-                        #    "from sum", mySum, "and deg", degree
                 print "Setting node %s embedding to %.5f from sum %.5f and deg %s" % \
                     (node.name, (mySum / float(degree + 1.0)), mySum, degree)
 
@@ -3167,6 +3184,11 @@ class TermLayout(object):
 
 
     def setRanks(self, source):
+        """Determine rank (level) value of each node.
+
+           @param source: source node of graph
+           @return the maximum rank assigned
+        """
         import collections
         source.rank = 0
         current = collections.deque([source])
@@ -3192,10 +3214,17 @@ class TermLayout(object):
 
 
     def makeProper(self, source):
-        # Add dummy nodes
-        # This does more than actually makeProper, to match Auber/Tulip, it
-        # adds one dummy node for any length>1 link and two for any length>2
-        # It adds them right after the source and right before the sink.
+        """Add placer nodes along multi-rank edges.
+
+           To match the Tulip 4.9.0 implementation, this does not actually
+           create a placer node at every rank along a link. Instead, it adds a
+           maximum of placer nodes when a link spans several ranks. It adds
+           one right after the source and right after the sink. Note that the
+           before the sink may get shifted as its true rank is not one before
+           the sink.
+
+           @param source: source node of graph
+        """
         toAppend = list()
         for link in self._links:
             link.children = []
@@ -3286,6 +3315,7 @@ class TermLayout(object):
             print link.source, link.sink, link.segments
 
     def create_single_source(self):
+        """Add single source to DAG."""
         sources = list()
         for node in self._nodes.values():
             if not node._in_links:
@@ -3309,6 +3339,10 @@ class TermLayout(object):
         return source
 
     def has_cycles(self):
+        """Check if graph has cycles.
+
+           @return True if graph has cycles.
+        """
         seen = set()
         stack = set()
         self.tree = True
@@ -3320,6 +3354,13 @@ class TermLayout(object):
         return False
 
     def cycles_from(self, node, seen, stack):
+        """Helper function for cycle check. This also does the tree check.
+
+           @param node: TermNode currently being checked
+           @param seen: Set of nodes already seen / visited
+           @param stack: stack of nodes currently being checked
+           @return True when cycle is detected.
+        """
         seen.add(node.name)
         stack.add(node.name)
 
@@ -3342,6 +3383,11 @@ class TermLayout(object):
 
 
 def interactive_helper(stdscr, graph):
+    """Function for curses wrapper.
+
+       @param stdscr: curses window
+       @param graph: TermGraph to be shown in curses window
+    """
     curses.start_color()
     can_color = curses.has_colors()
     curses.use_default_colors()

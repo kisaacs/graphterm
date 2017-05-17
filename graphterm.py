@@ -112,32 +112,6 @@ class TermDAG(object):
         if self.question:
             self.initialize_question()
 
-    def reset(self):
-        self._positions_set = False
-        self.gridsize = [0,0]
-        self.gridedge = [] # the last char per row
-        self.grid = []
-        self.grid_colors = []
-        self.row_max = 0
-        self.row_names = dict()
-        self.placers = set()
-        self.left_offset = 0
-        self.right_offset = 0
-
-        toDelete = list()
-        for node in self._nodes.values():
-            if not node.real:
-                toDelete.append(node)
-            else:
-                node.reset()
-
-        for node in toDelete:
-            del self._nodes[node.name]
-            del node
-
-        for link in self._links:
-            link.reset()
-
 
     def log_character(self, ch):
         """Write a character to the interaction log.
@@ -1018,8 +992,6 @@ class TermDAG(object):
         return color
 
 
-
-
     def resize(self, stdscr):
         """Handle curses resize event.
 
@@ -1056,6 +1028,7 @@ class TermDAG(object):
                 self.qpad_pos_y = self.height - self.gridsize[0] - 3
             else:
                 self.qpad_pos_y = 0
+
 
     def center_xy(self, stdscr, x, y):
         """Center the pad around (x,y). If this moved the pad off the screen,
@@ -1106,6 +1079,7 @@ class TermDAG(object):
             self.pad_corner_y += amount
             self.pad_corner_y = min(self.pad_corner_y, self.gridsize[0] + self.pad_pos_y - self.pad_extent_y)
 
+
     def scroll_down(self, amount = 1):
         """Performs downwards scroll by moving the main pad.
 
@@ -1114,6 +1088,7 @@ class TermDAG(object):
         if self.pad_corner_y > 0:
             self.pad_corner_y -= amount
             self.pad_corner_y = max(self.pad_corner_y, 0)
+
 
     def scroll_left(self, amount = 1):
         """Performs left scroll by moving the main pad.
@@ -1124,6 +1099,7 @@ class TermDAG(object):
             self.pad_corner_x += amount
             self.pad_corner_x = min(self.pad_corner_x, self.gridsize[1])
 
+
     def scroll_right(self, amount = 1):
         """Performs right scroll by moving the main pad.
 
@@ -1132,6 +1108,7 @@ class TermDAG(object):
         if self.pad_corner_x > 0:
             self.pad_corner_x -= amount
             self.pad_corner_x = max(self.pad_corner_x, 0)
+
 
     def refresh_pad(self):
         """Refresh the main pad. Used for redrawing.
@@ -1142,6 +1119,7 @@ class TermDAG(object):
         self.refresh_hpad()
         if self.qpad:
             self.refresh_qpad()
+
 
     def toggle_help(self, stdscr):
         """Change the state of the help menu between collapsed and expanded.
@@ -1157,6 +1135,7 @@ class TermDAG(object):
             self.refresh_hpad()
             stdscr.refresh()
             self.refresh_pad()
+
 
     def collapse_help(self):
         """Show only the basic help commands."""
@@ -1626,6 +1605,7 @@ class TermDAG(object):
 
         return name
 
+
     def redraw_default(self, stdscr, offset):
         """Redraws the default (unhighlighted) graph to curses.
 
@@ -1639,6 +1619,7 @@ class TermDAG(object):
                     self.pad.addch(h, w, self.grid[h][w], curses.color_pair(self.default_color))
                 else:
                     continue
+
 
     def write_graphical_positions(self):
         """Writes out the graphical positions for debugging."""
@@ -1844,12 +1825,14 @@ class TermBST(object):
     def __init__(self):
         self.root = None
 
+
     def insert(self, segment):
         """Insert segment into the BST.
 
            @param segment: segment to be inserted
         """
         self.root = self.insert_helper(self.root, segment)
+
 
     def insert_helper(self, root, segment):
         """Helper function for segment insert.
@@ -1886,6 +1869,7 @@ class TermBST(object):
         segment2.b1 = b1
         segment1.b2 = b2
         segment2.b2 = b2
+
 
     def find(self, segment):
         """Find segment node in BST.
@@ -2022,12 +2006,14 @@ class TermBST(object):
         if replacement:
             replacement.parent = node.parent
 
+
     def print_tree(self):
         """Print the BST."""
         print '--- Tree ---'
         if self.root:
             self.print_tree_helper(self.root, '')
         print '------------'
+
 
     def print_tree_helper(self, root, indent):
         """Print a BST subtree for debugging.
@@ -2041,6 +2027,7 @@ class TermBST(object):
         if root.right:
             self.print_tree_helper(root.right, indent + '   ')
 
+
     def tree_to_list(self):
         """Flattens BST to in-order list.
 
@@ -2049,6 +2036,7 @@ class TermBST(object):
         lst = []
         lst = self.tree_to_list_helper(self.root, lst)
         return lst
+
 
     def tree_to_list_helper(self, root, lst):
         """Helper in creating BST in-order list.
@@ -2219,6 +2207,7 @@ class TermSegment(object):
 
         return other
 
+
     # The x1, y1 are always the least negative y and therefore
     # in the sorting order they act as the  bottom
     def is_bottom_endpoint(self, x, y):
@@ -2232,6 +2221,7 @@ class TermSegment(object):
             return True
         return False
 
+
     def is_top_endpoint(self, x, y):
         """Check if (x,y) is the top end point of the segment.
 
@@ -2242,6 +2232,7 @@ class TermSegment(object):
         if abs(x - self.x2) < 1e-6 and abs(y - self.y2) < 1e-6:
             return True
         return False
+
 
     def intersect(self, other, debug = False):
         """Check for intersection with another segment.
@@ -2311,6 +2302,7 @@ class TermSegment(object):
             and self.y1 == other.y1
             and self.y2 == other.y2)
 
+
     # For the line-sweep algorithm, we have some consistent ordering
     # as we will have a lot of collisions on just y alone.
     def __lt__(self, other):
@@ -2332,6 +2324,7 @@ class TermSegment(object):
             return True
 
         return False
+
 
     def traditional_sort(self, other):
         """Comparison operator for traditional sort. Only compares end point
@@ -2355,6 +2348,7 @@ class TermSegment(object):
 
         return False
 
+
     def __str__(self):
         """String representation of a segment.
 
@@ -2362,6 +2356,7 @@ class TermSegment(object):
         """
         return "%s - TermSegment(%s, %s, %s, %s) " % (self.name, self.x1, self.y1,
             self.x2, self.y2) + str(self.paths)
+
 
     def __hash__(self):
         """Hash of a segment.
@@ -2398,6 +2393,7 @@ class TermNode(object):
         self.crossing_counts = dict() # y -> # of crossings from in segments
         self.crossing_heights = dict() # y -> where the crossing should occur
 
+
     def reset(self):
         """Reset layout values to prepare for re-doing layout."""
         self.rank = -1 # Int
@@ -2412,6 +2408,7 @@ class TermNode(object):
         self.crossing_counts = dict() # y -> # of crossings from in segments
         self.crossing_heights = dict() # y -> where the crossing should occur
 
+
     def add_in_link(self, link):
         """Add in-link for bookkeeping.
 
@@ -2419,12 +2416,14 @@ class TermNode(object):
         """
         self._in_links.append(link)
 
+
     def add_out_link(self, link):
         """Add out-link for bookkeeping.
 
            @param link: TermLink with source at this node.
         """
         self._out_links.append(link)
+
 
     def add_in_segment(self, segment):
         """Add in-segment for bookkeeping.
@@ -2434,6 +2433,7 @@ class TermNode(object):
         if segment.y1 == segment.y2:
             self.vertical_in = segment
         self._in_segments.append(segment)
+
 
     def findCrossingHeights(self, min_x, max_x, debug = False):
         """Determine where crossings between segments should take place for bundling.
@@ -2499,11 +2499,13 @@ class TermLink(object):
 
         self.segments = []
 
+
     def reset(self):
         """Reset internal structures for layout information."""
         self._coords = None
 
         self.segments = []
+
 
     def skeleton_copy(self):
         """Copy with just enough information for layout."""
@@ -2579,6 +2581,7 @@ class TermLayout(object):
         """True if layout has been completed."""
         return self.valid
 
+
     def get_node_coord(self, name):
         """Returns the node's coordinate.
 
@@ -2586,6 +2589,7 @@ class TermLayout(object):
            @return Coordinate according to layout
         """
         return self._nodes[name].coord
+
 
     def get_link_segments(self, name):
         """Returns the list of a links segments.
@@ -2661,7 +2665,6 @@ class TermLayout(object):
 
             self.calcLayout(out, relativePosition, x + relativePosition[node],
                 decalY, decalLevel, rankSizes, indent + "  ")
-
 
 
     def treePlace(self, node, relativePosition, indent = " " ):
@@ -3002,6 +3005,7 @@ class TermLayout(object):
         """
         return (coord[0], coord[1] - self.spacing / 4.0)
 
+
     def beforeCoord(self, coord):
         """Return the coordinate just before the node.
 
@@ -3009,6 +3013,7 @@ class TermLayout(object):
            @return coordinate just higher in y
         """
         return (coord[0], coord[1] + self.spacing / 4.0)
+
 
     def computeEdgeBends(self):
         """Set the link segments as determined by the placer nodes in the layout."""
@@ -3338,7 +3343,6 @@ class TermLayout(object):
             self._links.append(link)
 
 
-
     def printNodeCoords(self):
         print "Current node coordinates:"
         for name, node in self._nodes.items():
@@ -3348,6 +3352,7 @@ class TermLayout(object):
         print "Current edge coordinates:"
         for link in self._original_links:
             print link.source, link.sink, link.segments
+
 
     def create_single_source(self):
         """Add single source to DAG."""
@@ -3372,6 +3377,7 @@ class TermLayout(object):
             self._running_neighbors['source'].add(node.name)
             self._running_neighbors[node.name].add('source')
         return source
+
 
     def has_cycles(self):
         """Check if graph has cycles.
@@ -3422,6 +3428,7 @@ class TermLayout(object):
 
         stack.remove(node.name)
         return False
+
 
 
 def interactive_helper(stdscr, graph):

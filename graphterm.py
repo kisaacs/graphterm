@@ -3071,31 +3071,35 @@ class TermLayout(object):
         """
         visited = dict()
 
+        # Find unique sink name
+        self.sink_name = 'layout_sink'
+        self.sink_name = self.create_unique_node_name(self.sink_name)
+
         # Add temporary sink and set visited
-        sink = TermNode('sink', False)
-        self._added['sink'] = 0
-        self._running_neighbors['sink'] = set()
-        self._running_neighbors['sink'].add('sink')
+        sink = TermNode(self.sink_name, False)
+        self._added[self.sink_name] = 0
+        self._running_neighbors[self.sink_name] = set()
+        self._running_neighbors[self.sink_name].add(self.sink_name)
         tmpSinkLinks = list()
         for name in self._nodes_list:
             node = self._nodes[name]
             visited[node.name] = False
             if not node._out_links:
                 linkName = node.name + '-sink'
-                sinkLink = TermLink(linkName, node.name, 'sink')
+                sinkLink = TermLink(linkName, node.name, self.sink_name)
                 self._links.append(sinkLink)
                 node.add_out_link(linkName)
                 sink.add_in_link(linkName)
                 tmpSinkLinks.append(sinkLink)
                 self._link_dict[linkName] = sinkLink
                 self._debug_names[linkName] = linkName
-                self._running_neighbors['sink'].add(node.name)
-                self._running_neighbors[node.name].add('sink')
+                self._running_neighbors[self.sink_name].add(node.name)
+                self._running_neighbors[node.name].add(self.sink_name)
 
         # Add sink to self._nodes after so we don't create a sink link to
         # itself
-        self._nodes['sink'] = sink # Caution!! This will not work if there is a node named sink, please fix
-        self._nodes_list.append('sink')
+        self._nodes[self.sink_name] = sink # Caution!! This will not work if there is a node named sink, please fix
+        self._nodes_list.append(self.sink_name)
 
         # Setup grid
         self.grid.append([])
@@ -3157,7 +3161,7 @@ class TermLayout(object):
             self._nodes[link.source]._out_links.remove(link.id)
             self._links.remove(link)
         del self._nodes[sink.name]
-        self._nodes_list.remove('sink')
+        self._nodes_list.remove(self.sink_name)
 
 
     def reduceTwoLayerCrossings(self, embedding, layer, isUp, degrees):
@@ -3185,8 +3189,8 @@ class TermLayout(object):
 
             # Account for sink between twice its neighbor in tulip
             # It must be added twice
-            if node.name == 'sink':
-                mySum += embedding['sink']
+            if node.name == self.sink_name:
+                mySum += embedding[self.sink_name]
 
             embedding[node.name] = mySum / float(degree + 1.0)
 
@@ -3206,7 +3210,7 @@ class TermLayout(object):
             degree = len(node._out_links) + len(node._in_links)
 
             # The sink has two extra degrees as it has a self loop in Tulip
-            if name == 'sink':
+            if name == self.sink_name:
                 degree += 2
 
             degrees[name] = degree
@@ -3344,6 +3348,23 @@ class TermLayout(object):
             print link.source, link.sink, link.segments
 
 
+    def create_unique_node_name(self, stub):
+        """Create a unique node name from the given stub.
+
+           @param stub: the initial trial name
+           @return a unique name in the graph (string)
+        """
+        if stub in self._nodes:
+            i = 0
+            trial_name = stub + str(i)
+            while trial_name in self._nodes:
+                i += 1
+                trial_name = stub + str(i)
+            stub = trial_name
+
+        return stub
+
+
     def create_single_source(self):
         """Add single source to DAG."""
         sources = list()
@@ -3351,21 +3372,26 @@ class TermLayout(object):
             if not node._in_links:
                 sources.append(node)
 
-        source = TermNode('source', False)
-        self._nodes['source'] = source
-        self._nodes_list.append('source')
-        self._added['source'] = 0
-        self._running_neighbors['source'] = set()
+        # Find unique source name
+        source_name = sources[0].name + '_layout_source'
+        source_name = self.create_unique_node_name(source_name)
+
+        # Add source node
+        source = TermNode(source_name, False)
+        self._nodes[source_name] = source
+        self._nodes_list.append(source_name)
+        self._added[source_name] = 0
+        self._running_neighbors[source_name] = set()
         for i, node in enumerate(sources):
-            linkName = 'source-' + str(i)
-            link = TermLink(linkName, 'source', node.name)
+            linkName = source_name + '-' + str(i)
+            link = TermLink(linkName, source_name, node.name)
             source.add_out_link(linkName)
             node.add_in_link(linkName)
             self._links.append(link)
             self._link_dict[linkName] = link
             self._debug_names[linkName] = linkName
-            self._running_neighbors['source'].add(node.name)
-            self._running_neighbors[node.name].add('source')
+            self._running_neighbors[source_name].add(node.name)
+            self._running_neighbors[node.name].add(source_name)
         return source
 
 

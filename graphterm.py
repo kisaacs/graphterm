@@ -2457,7 +2457,9 @@ class TermNode(object):
         # We use our own x as a normalization factor to figure out the
         # ordering of heights for bundling -- this is to separate the bundle 
         # heights going into the same row.
-        normalized = 0.5 * (self._x - min_x) / (max_x - min_x)
+        normalized = 1.0
+        if max_x - min_x != 0:
+            normalized = 0.5 * (self._x - min_x) / (max_x - min_x)
         #print "crossings for", self.name, self._x, self._y
         for y, count in self.crossing_counts.items():
             #print "   ", y, count

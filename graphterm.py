@@ -314,28 +314,102 @@ class TermDAG(object):
             #return
 
         # Consolidate crossing points
-        crossings_points = dict()
-        for k, v in self.crossings.items():
+        crossings_points = dict() # (x, y) -> set of segments
+        #crossed_segments = set()
+        for k, v in self.crossings.items(): # crossings is (seg1, seg2) -> (x, y)
             if v not in crossings_points:
                 crossings_points[v] = set()
             crossings_points[v].add(k[0])
             crossings_points[v].add(k[1])
+            self.segment_ids[k[0]].addCrossing(self.segment_ids[k[1]], v)
+            self.segment_ids[k[1]].addCrossing(self.segment_ids[k[0]], v)
+            #crossed_segments.insert(k[0])
+            #crossed_segments.insert(k[1])
 
+        for placer in self.placers:
+            placer.findInExtents(self.min_tulip_x, self.max_tulip_x, self.debug)
+
+
+        #for name in crossed_segments:
+        #    if self.segment_ids[name].extent:
+        #        self.segment_ids[name].defineCrossingHeights()
+
+
+        # For each crossing, figure out if the end point of either already has
+        # a set of height for that y value. Cases:
+        # Neither has one: proceed as normal
+        # One has one: shift the crossing to that y value
+        # More than one has them: Ignore for now
         for v, k in crossings_points.items():
+            x, y = v
             if self.debug:
                 print k, v
-            x, y = v
-            placer = TermNode('', None, False)
-            placer._x = x
-            placer._y = y
-            coord_to_node[(x,y)] = placer
-            coord_to_placer[(x,y)] = placer
+            special_heights = list()
+            if self.debug:
+                print "Testing point', v"
             for name in k:
                 segment = self.segment_ids[name]
-                new_segment = segment.split(placer)
+                #print 'Testing point', v, 'for segment', segment, 'with height', segment.end.crossing_heights
+                #print '  Is', segment.y1, 'there?'
+                if self.debug:
+                    print '   segment', segment.name, 'at end', segment.origin.original_end._x, segment.origin.original_end._y
+                if segment.y1 in segment.origin.original_end.crossing_heights:
+                    if self.debug:
+                        print '       found at height', segment.origin.original_end.crossing_heights[segment.y1]
+                    special_heights.append(segment.origin.original_end.crossing_heights[segment.y1])
+
+            placer_y = y
+            bundle = False
+            #print "Length of spcil heights is", len(special_heights)
+            if len(special_heights) == 1:
+                #print 'setting placer y to', special_heights[0]
+                placer_y = special_heights[0]
+                bundle = True
+            elif len(special_heights) > 1:
+                #print "Special heights are", special_heights
+                #for name in k:
+                #    print " ---", self.segment_ids[name]
+                continue
+
+            # Get placer
+            if (x,placer_y) in coord_to_node:
+                placer = coord_to_node[(x,placer_y)]
+            else:
+                placer = TermNode('', None, False)
+                placer._x = x
+                placer._y = placer_y
+                coord_to_node[(x,placer_y)] = placer
+                coord_to_placer[(x,placer_y)] = placer
+
+            # Create segment break
+            for name in k:
+                segment = self.segment_ids[name]
+                if self.debug:
+                    print "Creating new segment from:", segment, "at", placer._x, placer._y
+                new_segment = segment.split(placer, bundle, self.debug)
+                if self.debug:
+                    print "    Split: ", segment
+                    print "  Created: ", new_segment
                 segments.add(new_segment)
             xset.add(x)
-            yset.add(y)
+            yset.add(placer_y)
+
+
+        #for v, k in crossings_points.items():
+        #    if self.debug:
+        #        print k, v
+        #    x, y = v
+        #    placer = TermNode('', None, False)
+        #    placer._x = x
+        #    placer._y = y
+        #    coord_to_node[(x,y)] = placer
+        #    coord_to_placer[(x,y)] = placer
+        #    for name in k:
+        #        segment = self.segment_ids[name]
+        #        new_segment = segment.split(placer)
+        #        segments.add(new_segment)
+        #    xset.add(x)
+        #    yset.add(y)
 
         # Based on the tulip layout, do the following:
         xsort = sorted(list(xset))
@@ -367,6 +441,9 @@ class TermDAG(object):
         # Figure out how nodes map to rows so we can figure out label
         # placement allowances
         self.row_last = [0 for x in range(self.gridsize[0])]
+        self.row_last_mark = [0 for x in range(self.gridsize[0])]
+        self.row_first = [self.gridsize[1] for x in range(self.gridsize[0])]
+        self.row_first_mark = [self.gridsize[1] for x in range(self.gridsize[0])]
         for coord, node in coord_to_node.items():
             node._row = segment_pos[coord[1]]
             node._col = column_multiplier * col_lookup[coord[0]]
@@ -376,16 +453,14 @@ class TermDAG(object):
                 row_nodes[node._row].append(node)
                 if node._col > self.row_last[node._row]:
                     self.row_last[node._row] = node._col
+                    self.row_last_mark[node._row] = node._col
+                if node._col < self.row_first[node._row]:
+                    self.row_first[node._row] = node._col
+                    self.row_first_mark[node._row] = node._col
 
         # Sort the labels by left-right position
         for row, nodes in row_nodes.items():
             row_nodes[row] = sorted(nodes, key = lambda node: node._col)
-
-        self.calculate_labels(row_nodes)
-
-        # Max number of columns needed -- we add one for a space
-        # between the graph and the labels.
-        self.gridsize[1] = self.row_max + 1
 
         # Find the node order:
         self.node_order = sorted(self._nodes.values(),
@@ -403,10 +478,10 @@ class TermDAG(object):
             node._row = segment_pos[coord[1]]
             node._col = column_multiplier * col_lookup[coord[0]]
             if node.real:
-                self.grid[node._row][node._col] = 'o'
+                self.grid[node._row][self.left_offset + node._col] = 'o'
 
                 if self.debug:
-                    print 'Drawing node at', node._row, node._col
+                    print 'Drawing node at', node._row, self.left_offset + node._col
                     self.print_grid()
 
 
@@ -419,13 +494,45 @@ class TermDAG(object):
         status = 'passed'
         for segment in segments:
             segment.gridlist =  self.draw_line(segment)
-            self.row_last, err = self.set_to_grid(segment, self.row_last)
+            err = self.set_to_grid(segment) #, self.row_last)
+            if not err:
+                status = 'drawing'
+
+        self.grid = []
+        self.gridedge = []
+        self.grid_colors = []
+        self.calculate_max_labels(row_nodes)
+
+        # Max number of columns needed -- we add one for a space
+        # between the graph and the labels.
+        self.gridsize[1] = self.row_max + 1
+
+        # Re-create the grid for labels
+        for i in range(self.gridsize[0]):
+            self.grid.append([' ' for j in range(self.gridsize[1])])
+            self.gridedge.append(0)
+
+        # Re-Add the nodes in the grid
+        for coord, node in coord_to_node.items():
+            node._row = segment_pos[coord[1]]
+            node._col = column_multiplier * col_lookup[coord[0]]
+            if node.real:
+                self.grid[node._row][self.left_offset + node._col] = 'o'
+
+                if self.debug:
+                    print 'Drawing node at', node._row, self.left_offset + node._col
+                    self.print_grid()
+
+        # Re-Add segments to the grid
+        status = 'passed'
+        for segment in segments:
+            segment.gridlist =  self.draw_line(segment)
+            err = self.set_to_grid(segment) #, self.row_last)
             if not err:
                 status = 'drawing'
 
         # Add labels to the grid
-        self.calculate_labels(row_nodes, check_grid = True)
-        self.names_to_grid()
+        self.place_labels(row_nodes)
 
         if self.debug:
             self.print_grid()
@@ -434,6 +541,7 @@ class TermDAG(object):
 
         self.layout = True
         return status
+
 
 
     def layout_hierarchical_tulip(self):

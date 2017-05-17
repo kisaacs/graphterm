@@ -3380,13 +3380,20 @@ class TermLayout(object):
         """
         seen = set()
         stack = set()
-        self.tree = True
+        self.single_source_tree = True
+        source_count = 0
         for node in self._nodes.values():
             if not node._in_links:
+                source_count += 1
                 if self.cycles_from(node, seen, stack):
+                    self.single_source_tree = False
                     return True
-
+            elif len(node._in_links) > 1:
+                self.single_source_tree = False
+        if source_count > 1:
+            self.single_source_tree = False
         return False
+
 
     def cycles_from(self, node, seen, stack):
         """Helper function for cycle check. This also does the tree check.

@@ -2488,7 +2488,7 @@ class TermLayout(object):
         self.original = graph
         self.valid = False
         self.err = ""
-        self.single_source_tree = False
+        self.single_source_tree = True
 
         self._nodes = dict()
         self._nodes_list = list()
@@ -2625,10 +2625,6 @@ class TermLayout(object):
             self.calcLayout(out, relativePosition, x + relativePosition[node],
                 decalY, decalLevel, rankSizes, indent + "  ")
 
-            # Old
-            #self.calcLayout(out, relativePosition,
-            #    x + relativePosition[node], y + self.spacing,
-            #    rank + 1, rankSizes)
 
 
     def treePlace(self, node, relativePosition, indent = " " ):
@@ -2855,6 +2851,8 @@ class TermLayout(object):
                 if not node._in_links:
                     source_node = node
                     break
+            for link in self._links:
+                link.children = []
         else:
             source_node = self.create_single_source()
 

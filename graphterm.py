@@ -1664,12 +1664,17 @@ class TermDAG(object):
            We sweep from bottom to top because the layout y's are
            negative values. The intuition is having the DAG
            upside down and sweeping from top to bottom.
+
+           @param segments: list of TermSegments
         """
         self.bst = TermBST() # BST of segments crossing L
         self.pqueue = [] # Priority Queue of potential future events
         self.crossings = dict() # Will be (segment1, segment2) = (x, y)
 
         # Put all segments in queue
+        # The pushed tuple is of the form (y, x, name1, name2)
+        # Different names indicate the (y, x) is a crossing rather than an
+        # endpoint
         for segment in segments:
             heapq.heappush(self.pqueue, (segment.y1, segment.x1, segment.name, segment.name))
             heapq.heappush(self.pqueue, (segment.y2, segment.x2, segment.name, segment.name))
@@ -1679,9 +1684,9 @@ class TermDAG(object):
             segment1 = self.segment_ids[name1]
             segment2 = self.segment_ids[name2]
 
-            #if self.debug:
-            #    print "\n     Popping", x1, y1, segment1, segment2
-            #    self.print_pqueue()
+            if self.debug:
+                print "\n     Popping", x1, y1, segment1, segment2
+                self.print_pqueue()
 
             if segment1.is_top_endpoint(x1, y1):
                 self.top_endpoint(segment1)
@@ -1696,36 +1701,44 @@ class TermDAG(object):
 
            @param segment: current segment
         """
+
+        # Add end point to BST
         self.bst.insert(segment)
 
-        #if self.debug:
-        #    print "     Adding", segment
-        #    self.bst.print_tree()
+        if self.debug:
+            print "     Adding", segment
+            self.bst.print_tree()
 
+        # Check for crossings of BST neighbors of the segment
+        # If it exists, remove it
         before = self.bst.find_previous(segment, self.debug)
         after = self.bst.find_next(segment, self.debug)
         if before and after and (before.name, after.name) in self.crossings:
             x, y = self.crossings[(before.name, after.name)]
             self.pqueue.remove((y, x, before.name, after.name))
             heapq.heapify(self.pqueue)
-            #if self.debug:
-            #    print " -- removing (", y, ",", x, ",", before, after,")"
+            if self.debug:
+                print " -- removing (", y, ",", x, ",", before, after,")"
+
+        # Check for and catalog crossing of before neighbor
         bcross, x, y = segment.intersect(before, self.debug)
         if bcross and (y, x, before.name, segment.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, before.name, segment.name))
             self.crossings[(before.name, segment.name)] = (x, y)
-            #if self.debug:
-            #    print " -- pushing (", y, ",", x, ",", before, segment, ")"
+            if self.debug:
+                print " -- pushing (", y, ",", x, ",", before, segment, ")"
+
+        # Check for and catalog crossing of after neighbor
         across, x, y = segment.intersect(after, self.debug)
         if across and (y, x, segment.name, after.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, segment.name, after.name))
             self.crossings[(segment.name, after.name)] = (x, y)
-            #if self.debug:
-            #    print " -- pushing (", y, ",", x, ",", segment, after,")"
+            if self.debug:
+                print " -- pushing (", y, ",", x, ",", segment, after,")"
 
-        #if self.debug and (before or after):
-        #    print "CHECK: ", bcross, across, segment, before, after
-        #    self.print_pqueue()
+        if self.debug and (before or after):
+            print "CHECK: ", bcross, across, segment, before, after
+            self.print_pqueue()
 
 
     def bottom_endpoint(self, segment):
@@ -1733,44 +1746,45 @@ class TermDAG(object):
 
            @param segment: current segment
         """
-        #if self.debug:
-        #    print "     Bottom Check", segment
-        #    self.bst.print_tree()
+        if self.debug:
+            print "     Bottom Check", segment
+            self.bst.print_tree()
+
+        # Find BST neighbors
         before = self.bst.find_previous(segment, self.debug)
         after = self.bst.find_next(segment, self.debug)
 
+        # Remove segment from BST
         self.bst.delete(segment, self.debug)
 
-        #if self.debug:
-        #    print "     Deleting", segment
-        #    self.bst.print_tree()
+        if self.debug:
+            print "     Deleting", segment
+            self.bst.print_tree()
 
+        # Check for and catalog crossing of neighbors
         if before:
             bacross, x, y = before.intersect(after, self.debug)
             if bacross and y > segment.y1 and (y, x, before.name, after.name) not in self.pqueue:
                 heapq.heappush(self.pqueue, (y, x, before.name, after.name))
                 self.crossings[(before.name, after.name)] = (x, y)
-                #if self.debug:
-                #    print " -- adding (", y, ",", x, ",", before, after,")"
-                #    self.print_pqueue()
+                if self.debug:
+                    print " -- adding (", y, ",", x, ",", before, after,")"
+                    self.print_pqueue()
 
 
     def crossing(self, c1, c2, segment1, segment2):
         """Handle crossing case in Bentley-Ottman.
 
-           @param c1:
-           @param c2:
-           @param segment1:
-           @param segment2:
+           @param c1: crossing y coordinate
+           @param c2: crossing x coordinate
+           @param segment1: first crossing segment
+           @param segment2: second crossing segment
         """
-        #if self.debug:
-        #    print "     Crossing check", c1, c2, segment1, segment2
-        #    self.bst.print_tree()
+        if self.debug:
+            print "     Crossing check", c1, c2, segment1, segment2
+            self.bst.print_tree()
 
-        # Not sure I need this check. I think I've always been putting them in
-        # the right order.
-        #if segment1.b1 <= c1:
-        #if segment1.y1 < c2:
+        # Find neighbors in the BST of the crossing pair
         first = segment1
         second = segment2
         before = self.bst.find_previous(first, self.debug)
@@ -1778,23 +1792,15 @@ class TermDAG(object):
             first = segment2
             second = segment1
             before = self.bst.find_previous(first, self.debug)
-        #else:
-        #    print "UNICORN"
-        #    first = segment2
-        #    second = segment1
 
-        #before = self.bst.find_previous(first, self.debug)
         after = self.bst.find_next(second, self.debug)
-        #if self.debug:
-        #    print "       before:", before
-        #    print "        after:", after
 
-        # Now do the swap
+        # Now do the swap of the crossing segmenets
         self.bst.swap(first, second, c1, c2)
 
-        #if self.debug:
-        #    print "     Swapping", first, second
-        #    self.bst.print_tree()
+        if self.debug:
+            print "     Swapping", first, second
+            self.bst.print_tree()
 
         # Remove crossings between first/before and second/after
         # from the priority queue
@@ -1803,33 +1809,33 @@ class TermDAG(object):
             if (y, x, second.name, after.name) in self.pqueue:
                 self.pqueue.remove((y, x, second.name, after.name))
                 heapq.heapify(self.pqueue)
-                #if self.debug:
-                #    print " -- removing (", y, ",", x, ",", second, after, ")"
+                if self.debug:
+                    print " -- removing (", y, ",", x, ",", second, after, ")"
         if before and first and (before.name, first.name) in self.crossings:
             x, y = self.crossings[(before.name, first.name)]
             if (y, x, before.name, first.name) in self.pqueue:
                 self.pqueue.remove((y, x, before.name, first.name))
                 heapq.heapify(self.pqueue)
-                #if self.debug:
-                #    print " -- pushing (", y, ",", x, ",", before, first, ")"
+                if self.debug:
+                    print " -- pushing (", y, ",", x, ",", before, first, ")"
 
-        # Add possible new crossings
+        # Add possible new crossings after the swap
         if before:
             cross1, x, y = before.intersect(second, self.debug)
             if cross1 and y > c2 and (y, x, before.name, second.name) not in self.pqueue:
                 heapq.heappush(self.pqueue, (y, x, before.name, second.name))
                 self.crossings[(before.name, second.name)] = (x, y)
-                #if self.debug:
-                #    print " -- pushing (", y, ",", x, ",", before, second,")"
+                if self.debug:
+                    print " -- pushing (", y, ",", x, ",", before, second,")"
         cross2, x, y = first.intersect(after, self.debug)
         if cross2 and y > c2 and (y, x, first.name, after.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, first.name, after.name))
             self.crossings[(first.name, after.name)] = (x, y)
-            #if self.debug:
-            #    print " -- pushing (", y, ",", x, ",", first, after, ")"
+            if self.debug:
+                print " -- pushing (", y, ",", x, ",", first, after, ")"
 
-        #if self.debug:
-        #    self.print_pqueue()
+        if self.debug:
+            self.print_pqueue()
 
 
 class TermBST(object):
@@ -1912,9 +1918,9 @@ class TermBST(object):
            @return predecessor node
         """
         node = segment.BSTNode
-        #if node is None and debug:
-        #    print "ERROR, could not find", segment, " in find_previous"
-        #    return None
+        if node is None and debug:
+            print "ERROR, could not find", segment, " in find_previous"
+            return None
         predecessor = node.left
         last = predecessor
         while predecessor:
@@ -1943,9 +1949,9 @@ class TermBST(object):
            @return successor node
         """
         node = segment.BSTNode
-        #if node is None and debug:
-        #    print "ERROR, could not find", segment, " in find_next"
-        #    return None
+        if node is None and debug:
+            print "ERROR, could not find", segment, " in find_next"
+            return None
         successor = node.right
         last = successor
         while successor:
@@ -1972,13 +1978,12 @@ class TermBST(object):
            @param segment: segment to be deleted
            @param debug: True if debug information should be printed.
         """
-        #node = self.find(segment)
         node = segment.BSTNode
         segment.BSTNode = None
         if node is None:
-            #if debug:
-            #    print "ERROR, could not find", segment, "in delete"
-            #    self.print_tree()
+            if debug:
+                print "ERROR, could not find", segment, "in delete"
+                self.print_tree()
             return
 
         replacement = None
@@ -2009,9 +2014,9 @@ class TermBST(object):
         elif node.parent.right == node:
             node.parent.right = replacement
         else:
-            #if debug:
-            #    print "ERROR, parenting error on", segment, "in delete"
-            #    self.print_tree()
+            if debug:
+                print "ERROR, parenting error on", segment, "in delete"
+                self.print_tree()
             return
 
         if replacement:
@@ -2064,6 +2069,10 @@ class TermBSTNode(object):
     """Class for Binary Search Tree node struct."""
 
     def __init__(self, segment):
+        """Constructor of TermBSTNode
+
+           @param segment: segment contained in BST node.
+        """
         self.segment = segment
         self.left = None
         self.right = None
@@ -2074,6 +2083,14 @@ class TermSegment(object):
     """A straight-line portion of a drawn poly-line in the graph rendering."""
 
     def __init__(self, x1, y1, x2, y2, name = ''):
+        """Constructor for TermSegment.
+
+           @param x1: x-coordinate of start
+           @param y1: y-coordinate of start
+           @param x2: x-coordinate of end
+           @param y2: y-coordinate of end
+           @param name: optional name of segment
+        """
         self.x1 = x1
         self.x2 = x2
         self.y1 = y1
@@ -2358,6 +2375,12 @@ class TermNode(object):
     """Class for internal node representation."""
 
     def __init__(self, node_id, real = True):
+        """Constructor for TermNode.
+
+           @param node_id: name of the node
+           @param real: True if part of the given graph, False if used
+                        of layout of edges (placer node)
+        """
         self.name = node_id
         self._in_links = list()
         self._out_links = list()
@@ -2460,6 +2483,12 @@ class TermLink(object):
     """Class for internal link representation."""
 
     def __init__(self, link_id, source_id, sink_id):
+        """Constructor for TermLink.
+
+           @param link_id: the name of the link
+           @param source_id: the name of the source node
+           @param sink_id: the name of the sink node
+        """
         self.id = link_id
         self.source = source_id
         self.sink = sink_id
@@ -2485,6 +2514,12 @@ class TermLayout(object):
        framework."""
 
     def __init__(self, graph, sweeps = 4):
+        """Constructor for TermLayout.
+
+           @param graph: TermDAG object
+           @param sweeps: Number of iterations of crossing reduction, defaults
+                          to 4
+        """
         self.original = graph
         self.valid = False
         self.err = ""

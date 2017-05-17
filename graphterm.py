@@ -2413,6 +2413,12 @@ class TermNode(object):
         self._in_segments.append(segment)
 
     def findCrossingHeights(self, min_x, max_x, debug = False):
+        """Determine where crossings between segments should take place for bundling.
+
+           @param min_x: min_x in outer graph
+           @param max_x: max_x in outer graph
+           @param debug: if True, print debug information
+        """
         if debug:
             print 'Find extents', self.name, self._x, self._y
         for segment in self._in_segments:
@@ -2425,16 +2431,23 @@ class TermNode(object):
 
         # We set different offsets for different x values based on the
         # min and max x -- we never go higher than half way up the y value
+        # We use our own x as a normalization factor to figure out the
+        # ordering of heights for bundling -- this is to separate the bundle 
+        # heights going into the same row.
+        normalized = 0.5 * (self._x - min_x) / (max_x - min_x)
         #print "crossings for", self.name, self._x, self._y
         for y, count in self.crossing_counts.items():
             #print "   ", y, count
             if count > 0:
-                normalized = 0.5 * (self._x - min_x) / (max_x - min_x)
                 offset = (self._y - y) * normalized
                 self.crossing_heights[y] = self._y - offset
 
 
     def skeleton_copy(self):
+        """Copy for graph layout.
+
+           @return new TermNode with only link information.
+        """
         cpy = TermNode(self.name, self.real)
         for link in self._in_links:
             cpy.add_in_link(link.id)
@@ -2827,6 +2840,9 @@ class TermLayout(object):
 
 
     def layout(self):
+        """Run layout algorithm. After the algorithm is run, the resulting
+           coordinates are in TL's skeleton nodes and links.
+        """
         # Check for cycles -- error if not a DAG
         if self.has_cycles():
             self.valid = False
@@ -2857,8 +2873,6 @@ class TermLayout(object):
         embedding = dict()
 
 
-
-
         # Reorder in rank
         if debug_layout:
             print "Checking single source tree..."
@@ -2866,7 +2880,6 @@ class TermLayout(object):
             if debug_layout:
                 print "Reducing crossings..."
             self.reduceCrossings(source_node, embedding)
-            # TODO: Set Edge Order ? 
 
             #if debug_layout:
             #    print "Crossings reduced, creating spanning tree..."
@@ -2894,32 +2907,19 @@ class TermLayout(object):
         #if debug_layout:
         #    self.printNodeCoords()
         #    self.printEdgeCoords()
-        # We disallow self loops, so nothing to do here
 
-        # Adjust edge/node overlap -- skip for now
-        maxLayerSize = [1 for x in range(maxRank)]  # All nodes have size 1
-        offset = 0.5 + self.spacing/4.0 # Therefore all offsetes are the same
-        # Note also that we know the source level is also less than the target
-        # level, therefore, we need to flip the offsets.
-        for link in self._original_links:
-            source = self._nodes[link.source]
-            sink = self._nodes[link.sink]
-            if not link.segments:
-                pass
-                #source.coord[1] -= offset
-                #sink.coord[1] += offset
-            else:
-                pass
-        # NOTE TO SELF: We don't have the right number of segments so I don't
-        # think this is something happening here. It must happen earlier.
-
-
-        # Post-process to align nodes -- also skip for now
-        #
         self.valid = True
 
+
     def createSpanningTree(self, embedding):
-        # Only keeps the middle edge
+        """Modify the skeleton graph structure such that there's a tree rather
+           than a DAG.
+
+           @param embedding: The dictionary keeping embedding values for each node
+        """
+
+        # We only keep one in-link: the one that falls in the middle of 
+        # our sort of them by the embedding of their sources.
         if debug_layout:
             print "SPANNING TREE"
         for name in self._nodes_list:
@@ -2927,40 +2927,60 @@ class TermLayout(object):
             if len(node._in_links) > 1:
                 if debug_layout:
                     print "   Pre-sort", [self._debug_names[x] for x in node._in_links]
-                #node._in_links = sorted(node._in_links, key = lambda x : embedding[self._link_dict[x].source])
+
+                # Sort by source node
                 node._in_links.sort(key = lambda x : embedding[self._link_dict[x].source])
+
+                # Find the halfway point
                 half = int(math.floor(len(node._in_links) / 2))
+
+                # Keep only the halfway point
                 if debug_layout:
                     print "   Keeping", self._debug_names[node._in_links[half]], half, \
                         "of", [self._debug_names[x] for x in node._in_links], len(node._in_links)
                 node._in_links = [ node._in_links[half] ]
-            #elif debug_layout and len(node._in_links) == 1:
-            #    print "   Keeping", node._in_links[0], self._debug_names[node._in_links[0]]
+
+
+        # Remove all the links that were no kept. 
         for name in self._nodes_list:
             node = self._nodes[name]
             toRemove = list()
             for link in node._out_links:
                 if link not in self._nodes[self._link_dict[link].sink]._in_links:
                     toRemove.append(link)
-                    #node._out_links.remove(link)
             for link in toRemove:
                 node._out_links.remove(link)
             node._out_links = sorted(node._out_links, key = lambda x : embedding[self._link_dict[x].sink])
 
 
     def afterCoord(self, coord):
+        """Return the coordinate just after the node.
+
+           @param coord: coordinate to offset
+           @return coordinate just lower in y
+        """
         return (coord[0], coord[1] - self.spacing / 4.0)
 
     def beforeCoord(self, coord):
+        """Return the coordinate just before the node.
+
+           @param coord: coordinate to offset
+           @return coordinate just higher in y
+        """
         return (coord[0], coord[1] + self.spacing / 4.0)
 
     def computeEdgeBends(self):
-        # We have no replaced edges, since we modified them. -- at least their
-        # ID is the same
-        # We have no reversed edges, because we only allow true DAGs
-        # Note we do the spacing after & before coord for Tulip-like layout
+        """Set the link segments as determined by the placer nodes in the layout."""
+
+        # For each of the original links, set its segments
         for link in self._original_links:
+
+            # First bend is right after the source node in y
             link.segments.append(self.afterCoord(self._nodes[link.source].coord))
+
+            # If their are placer nodes, add the place the area around them
+            # This is just above the first placer node and just after the
+            # last placer node.
             if link.children:
                 firstCoord = self._nodes[link.sink].coord
                 secondCoord = self._nodes[link.children[-1].source].coord
@@ -2970,22 +2990,25 @@ class TermLayout(object):
                 else:
                     link.segments.append(self.beforeCoord(firstCoord))
                     link.segments.append(self.afterCoord(firstCoord))
+
+                # Finally add the node just before the sink
                 link.segments.append(self.beforeCoord(self._nodes[link.children[-1].sink].coord))
+
+            # If their are no placer nodes, just add the area right before the
+            # sink
             else:
                 link.segments.append(self.beforeCoord(self._nodes[link.sink].coord))
-        return
-
-        for link in self._original_links:
-            link.segments.append(self.afterCoord(self._nodes[link.source].coord))
-            processingCoord = self._nodes[link.sink].coord
-            link.segments.append(self.beforeCoord(processingCoord))
-            for nextLink in link.children:
-                link.segments.append(self.afterCoord(processingCoord))
-                processingCoord = self._nodes[nextLink.sink].coord
-                link.segments.append(self.beforeCoord(processingCoord))
 
 
     def initCross(self, name, visited, embedding, dfsid, indent = " "):
+        """Set the initial embedding order. This implements a DFS.
+
+           @param name: name of node to have its embedding set
+           @param visited: dictionary of already visited nodes
+           @param embedding: dictionary holding node embedding values
+           @param dfsid: depth first search depth
+           @param indent: optional indent string for debugging
+        """
         if (visited[name]):
             return
 
@@ -3005,6 +3028,11 @@ class TermLayout(object):
 
 
     def reduceCrossings(self, source, embedding):
+        """Permute the row order to reduce edge crossings.
+
+           @param source: source node of the DAG
+           @param embedding: dictionary of embeddings of nodes
+        """
         visited = dict()
 
         # Add temporary sink and set visited
@@ -3043,7 +3071,11 @@ class TermLayout(object):
             visited[name] = False
         self.initCross('source', visited, embedding, 1)
 
+        # Get node degrees based on original data plus added link
+        # to match original Tulip algorithm
         degrees = self.createFakeDegrees()
+
+        # Set the embedding of each row based on the initial crossing order
         for a, row in enumerate(self.grid):
             if debug_layout:
                 print "Setting node row", a
@@ -3056,6 +3088,7 @@ class TermLayout(object):
                 embedding[node.name] = i
             self.grid[a] = row
 
+        # Iterate through two-layer crossing reduction
         maxRank = len(self.grid) - 1
         for q in range(self.num_sweeps):
             # Up Sweep
@@ -3065,12 +3098,13 @@ class TermLayout(object):
                 self.reduceTwoLayerCrossings(embedding, i, True, degrees)
 
             # Down Sweep
-            for i in range(maxRank + 1): # was 'maxDepth' -- not sure what I was thinking there
+            for i in range(maxRank + 1):
                 if debug_layout:
                     print "  Two-layer on", i, "false "
                 self.reduceTwoLayerCrossings(embedding, i, False, degrees)
 
 
+        # Set final embedding based on leftover order
         if debug_layout:
             print "Past two layer crossings"
         for a, row in enumerate(self.grid):
@@ -3082,6 +3116,7 @@ class TermLayout(object):
                     print "Setting node", node.name, "embedding to", i
                 embedding[node.name] = i
 
+        # Remove the added sink
         for link in tmpSinkLinks:
             self._nodes[link.source]._out_links.remove(link.id)
             self._links.remove(link)
@@ -3114,25 +3149,21 @@ class TermLayout(object):
 
 
     def createFakeDegrees(self):
+        """In the Tulip 4.9.0 version of this algorithm, the degrees used
+           in the crossing reduction were based on the modified graph.
+           This calculates those.
+        """
         degrees = dict()
         for name in self._nodes_list:
             node = self._nodes[name]
             degree = len(node._out_links) + len(node._in_links)
+
+            # The sink has two extra degrees as it has a self loop in Tulip
             if name == 'sink':
                 degree += 2
 
             degrees[name] = degree
         return degrees
-
-    def setInitialCrossing(self, node, visited, embedding, i):
-        if visited[node.name]:
-            return
-
-        visited[node.name] = True
-        embedding[node.name] = i
-        for linkid in node._out_links:
-            sink = self._nodes[self._link_dict[linkid].sink]
-            self.setInitialCrossing(sink, visited, embedding, i+1)
 
 
     def setRanks(self, source):
@@ -3243,41 +3274,6 @@ class TermLayout(object):
             self._links.append(link)
 
 
-    def makeProperOldVersion(self, source):
-        # Add dummy nodes
-        # Note that this fixes an issue in Auber's makeProperDag which adds
-        # at most two dummy nodes rather than one at every level.
-        for link in self._links:
-            link.children = []
-            start = self._nodes[link.source]
-            end = self._nodes[link.sink]
-            startRank = start.rank
-            endRank = end.rank
-
-            end._in_links.remove(link.id)
-            nameBase = start.name + '-' + end.name
-
-            atRank = startRank + 1
-            lastLink = link
-            while atRank < endRank:
-                newName = nameBase + '-' + str(atRank)
-                newNode = TermNode(newName, False)
-                newNode.rank = atRank
-                self._nodes[newName] = newNode
-
-                lastLink.sink = newName
-                newNode.add_in_link(lastLink.id)
-                newLinkName = str(link.id) + '-' + str(atRank)
-                newLink = TermLink(newLinkName, newName, end.name)
-                newNode.add_out_link(newLink.id)
-                lastLink = newLink
-                link.children.append(newLink)
-                self._links.append(newLink)
-                self._link_dict[newLinkName] = newLink
-                atRank += 1
-
-            end.add_in_link(lastLink.id)
-
 
     def printNodeCoords(self):
         print "Current node coordinates:"
@@ -3295,10 +3291,6 @@ class TermLayout(object):
             if not node._in_links:
                 sources.append(node)
 
-
-        #if len(sources) == 1:
-        #    return sources[0]
-        #else:
         source = TermNode('source', False)
         self._nodes['source'] = source
         self._nodes_list.append('source')

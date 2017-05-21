@@ -8,6 +8,7 @@
 #      or Call printonly() to print the layout to screen with the top node
 #      highlighted.
 #
+# Dependencies
 # * The interactivity is managed through the curses library.
 # * The ASCII layout modifies a graphical layout (TermLayout) translated from 
 #   the Tulip graph drawing library: http://tulip.labri.fr/
@@ -693,7 +694,6 @@ class TermDAG(object):
             start = self.left_offset + self.row_last_mark[row] + 2 # Space between
             right_names = right_name + right_bracket
             for ch in right_names:
-                #print ch, row, start
                 self.grid[row][start] = ch
                 start += 1
 
@@ -1516,24 +1516,6 @@ class TermDAG(object):
                     self.pad.addch(h, w, self.grid[h][w], curses.color_pair(self.default_color))
                 else:
                     continue
-
-
-    def write_graphical_positions(self):
-        """Writes out the graphical positions for debugging."""
-        for node in self._nodes.values():
-            print node.name, node._x, node._y
-
-        for link in self._links:
-            print link.source, link.sink, link._coords
-
-
-    def print_pqueue(self):
-        """Writes out the priority queue for debugging."""
-        return
-        foo = sorted(self.pqueue)
-        print " * PQUEUE: "
-        for bar in foo:
-            print "   ", bar
 
 
     def find_crossings(self, segments):
@@ -3106,7 +3088,7 @@ def termdag_interactive_helper(stdscr, graph):
     """Function for curses wrapper.
 
        @param stdscr: curses window
-       @param graph: TermGraph to be shown in curses window
+       @param graph: TermDAG to be shown in curses window
     """
     curses.start_color()
     can_color = curses.has_colors()
@@ -3116,4 +3098,3 @@ def termdag_interactive_helper(stdscr, graph):
         curses.init_pair(i + 1, i, -1)
         curses.init_pair(i + 1 + curses.COLORS, 7, i)
     graph.print_interactive(stdscr, can_color)
-    graph.write_graphical_positions()

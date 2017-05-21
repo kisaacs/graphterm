@@ -21,9 +21,6 @@ import curses
 import curses.ascii
 import math
 
-# Print debug information for the initial graph layout
-debug_layout = False
-
 class TermDAG(object):
     """Class to store DAG layout and manage interactions.
 
@@ -63,11 +60,7 @@ class TermDAG(object):
         # Interactive behavior
         self.highlight_full_connectivity = False
 
-        # Debug flags
-        self.layout = False
-        self.debug = False
-        self.is_interactive = True
-        self.name = 'default'
+        self.layout = False # Is layout valid?
 
         # Pad containing layout
         self.pad = None
@@ -213,8 +206,6 @@ class TermDAG(object):
 
            @param name: name of node to add.
         """
-        if len(self._nodes.keys()) == 0:
-            self.name = name
         node = TermNode(name)
         self._nodes[name] = node
         self._nodes_list.append(name)
@@ -237,8 +228,7 @@ class TermDAG(object):
     def interactive(self):
         """Layout the graph and show interactively via curses."""
         self.layout_hierarchical()
-        if self.is_interactive:
-            curses.wrapper(termdag_interactive_helper, self)
+        curses.wrapper(termdag_interactive_helper, self)
 
         # Persist the depiction with stdout:
         self.print_grid(True)
@@ -290,8 +280,6 @@ class TermDAG(object):
         self.max_tulip_x = -1e9
         for node in self._nodes.values():
             coord = self.TL._nodes[node.name].coord
-            if debug_layout:
-                print "Node", node.name, coord
             node._x = coord[0]
             node._y = coord[1]
             xset.add(coord[0])
@@ -300,7 +288,6 @@ class TermDAG(object):
             coord_to_node[(coord[0], coord[1])] = node
             if coord[1] > maxy:
                 maxy = coord[1]
-                self.name = node.name
             self.max_tulip_x = max(self.max_tulip_x, coord[0])
             self.min_tulip_x = min(self.min_tulip_x, coord[0])
 
@@ -313,8 +300,6 @@ class TermDAG(object):
         segmentID = 0
         for link in self._links:
             link._coords = self.TL._link_dict[link.id].segments
-            if debug_layout:
-                print "Link", link.source, link.sink, link._coords
             last = (self._nodes[link.source]._x, self._nodes[link.source]._y)
             for coord in link._coords:
                 xset.add(coord[0])
@@ -368,17 +353,8 @@ class TermDAG(object):
             segment.original_end = self._nodes[link.sink]
 
 
-        if self.debug:
-            self.write_graphical_positions();
-            print "xset", sorted(list(xset))
-            print "yset", sorted(list(yset))
-
-
         # Find crossings between segments in graphical layout.
         self.find_crossings(segments)
-        if self.debug:
-            print "CROSSINGS ARE: "
-            #return
 
         # Consolidate crossing points so that fewer segment crossings will
         # have to be dealt with. This keeps track of the x and y values of
@@ -395,7 +371,7 @@ class TermDAG(object):
         # Based on the set of all crossings coming into a placer node,
         # calculate appropriate crossing heights.
         for placer in self.placers:
-            placer.findCrossingHeights(self.min_tulip_x, self.max_tulip_x, self.debug)
+            placer.findCrossingHeights(self.min_tulip_x, self.max_tulip_x)
 
         # For each crossing, figure out if the end point of either already has
         # a set of height for that y value. Cases:
@@ -404,20 +380,10 @@ class TermDAG(object):
         #     More than one has them: Ignore for now
         for v, k in crossings_points.items():
             x, y = v
-            if self.debug:
-                print k, v
             special_heights = list()
-            if self.debug:
-                print "Testing point", v
             for name in k:
                 segment = self.segment_ids[name]
-                if self.debug:
-                    print '   segment', segment.name, 'at end', \
-                        segment.origin.original_end._x, segment.origin.original_end._y
                 if segment.y1 in segment.origin.original_end.crossing_heights:
-                    if self.debug:
-                        print '       found at height', \
-                            segment.origin.original_end.crossing_heights[segment.y1]
                     special_heights.append(segment.origin.original_end.crossing_heights[segment.y1])
 
 
@@ -443,12 +409,7 @@ class TermDAG(object):
             # Create segment break
             for name in k:
                 segment = self.segment_ids[name]
-                if self.debug:
-                    print "Creating new segment from:", segment, "at", placer._x, placer._y
-                new_segment = segment.split(placer, bundle, self.debug)
-                if self.debug:
-                    print "    Split: ", segment
-                    print "  Created: ", new_segment
+                new_segment = segment.split(placer, bundle)
                 segments.add(new_segment)
             xset.add(x)
             yset.add(placer_y)
@@ -470,9 +431,6 @@ class TermDAG(object):
             if ypos in node_yset:
                 y += 1
             y += 1
-
-        if self.debug:
-            print self.gridsize
 
         # Setup lookups from x-coord to col and y-coord to row
         row_lookup = dict()
@@ -526,10 +484,6 @@ class TermDAG(object):
             if node.real:
                 self.grid[node._row][self.left_offset + node._col] = 'o'
 
-                if self.debug:
-                    print 'Drawing node at', node._row, self.left_offset + node._col
-                    self.print_grid()
-
 
         # Sort segments on drawing difficulty. This is used in the collision
         # policy to determine which character to draw.
@@ -568,10 +522,6 @@ class TermDAG(object):
             if node.real:
                 self.grid[node._row][self.left_offset + node._col] = 'o'
 
-                if self.debug:
-                    print 'Drawing node at', node._row, self.left_offset + node._col
-                    self.print_grid()
-
         # Re-Add segments to the grid
         status = 'passed'
         for segment in segments:
@@ -582,11 +532,6 @@ class TermDAG(object):
 
         # Add labels to the grid
         self.place_labels(row_nodes)
-
-        if self.debug:
-            self.print_grid()
-            for segment in segments:
-                print segment, segment.gridlist
 
         self.layout = True
         return status
@@ -661,8 +606,6 @@ class TermDAG(object):
         node.use_offset = True
         # Logic for unused left bracket
         #if node._col < half_row:
-        #    if self.debug:
-        #        print 'Adding', node.name, 'to left bracket'
         #    if left_bracket == '':
         #        left_bracket = ' [ ' + node.name
         #        node.label_pos = left_pos + 3
@@ -673,8 +616,6 @@ class TermDAG(object):
         #        left_pos += len(node.name) + 2
         #    left_nodes.append(node)
         #else:
-        if self.debug:
-            print 'Adding', node.name, 'to right bracket'
         if right_bracket == '':
             right_bracket = ' [ ' + node.name
             node.label_pos = right_pos + 3
@@ -684,8 +625,6 @@ class TermDAG(object):
             node.label_pos = right_pos + 2
             right_pos += len(node.name) + 2
 
-        if self.debug:
-            print 'placing', node.name, left_bracket, right_bracket
         return left_bracket, right_bracket, left_pos, right_pos
 
 
@@ -694,9 +633,6 @@ class TermDAG(object):
 
            @param row_nodes: mapping from row to list of nodes on that row
         """
-        if self.debug:
-            print 'gridsize is', self.gridsize
-            print 'offsets are', self.left_offset, self.right_offset
         # Place the labels on the grid
         for row, nodes in row_nodes.items():
             half_row = math.floor(self.row_last_mark[row] / 2) - 1 # subtract for indexing at 0
@@ -714,28 +650,20 @@ class TermDAG(object):
                 if last._col == self.row_last_mark[row]:
                     right_pos += len(last.name)
                     right_name = last.name
-                if self.debug:
-                    print 'placing', last.name, last.label_pos, 'on the right'
             elif not self.place_label_left(last):
                 if right_name == '':
                     last.use_offset = True
                     last.label_pos = right_pos
                     right_pos += len(last.name)
                     right_name = last.name
-                    if self.debug:
-                        print 'placing', last.name, last.label_pos, 'as right hang'
                 else:
                     left_bracket, right_bracket, left_pos, right_pos \
                         = self.place_label_bracket(last, left_bracket, right_bracket,
                             left_pos, right_pos, left_nodes, half_row)
-                    if self.debug:
-                        print 'placing', last.name, last.label_pos, 'in bracket'
 
             # Draw the rest 
             if len(nodes) > 1:
                 for node in nodes[0:-1]:
-                    if self.debug:
-                        print 'handling', node.name
                     if not self.place_label_right(node) and not self.place_label_left(node):
                         if right_name == '':
                             node.use_offset = True
@@ -755,25 +683,15 @@ class TermDAG(object):
             row_left_offset = self.left_offset + self.row_first_mark[row] - left_pos
             #- len(left_name) - len(left_bracket)
 
-            if self.debug:
-                print 'Row', row, self.left_offset, self.row_first_mark[row], \
-                    len(left_name), len(left_bracket), left_pos, row_left_offset
             # Absolute positioning of the left bracket labels
             for node in left_nodes:
                 node.use_offset = False
-                if self.debug:
-                    print 'Positioning', node.name, 'at', node.label_pos, '+', row_left_offset
                 node.label_pos += row_left_offset - len(left_name) - 1
 
 
             # Place bracketed elements
             start = self.left_offset + self.row_last_mark[row] + 2 # Space between
             right_names = right_name + right_bracket
-            if self.debug:
-                print 'gridsize is', self.gridsize
-                print 'offsets are', self.left_offset, self.right_offset
-                print 'row last is', self.row_last_mark[row]
-                print 'placing right names: ', right_names
             for ch in right_names:
                 #print ch, row, start
                 self.grid[row][start] = ch
@@ -833,11 +751,6 @@ class TermDAG(object):
         end = segment.end
         last_x = start._col
         last_y = start._row
-        if self.debug:
-            print '   Drawing', segment
-            print '   Drawing segment [', segment.start._col, ',', \
-                segment.start._row, '] to [', segment.end._col, ',', \
-                segment.end._row, ']', segment.gridlist, segment
         for i, coord in enumerate(segment.gridlist):
             x, y, char, draw = coord
             if x > self.row_last_mark[y]:
@@ -845,8 +758,6 @@ class TermDAG(object):
             if x < self.row_first_mark[y]:
                 self.row_first_mark[y] = x
             x += self.left_offset
-            if self.debug:
-                print 'Drawing', char, 'at', x, y
             if not draw or char == '':
                 continue
             if self.grid[y][x] == ' ':
@@ -877,8 +788,6 @@ class TermDAG(object):
             last_x = x
             last_y = y
 
-            if self.debug:
-                self.print_grid()
         #return row_last, success
         return success
 
@@ -892,12 +801,8 @@ class TermDAG(object):
         y1 = segment.start._row
         x2 = segment.end._col
         y2 = segment.end._row
-        if self.debug:
-            print 'Drawing', x1, y1, x2, y2, segment
 
         if segment.start.real:
-            if self.debug:
-                print 'Advancing due to segment start...'
             y1 += 1
 
         if x2 > x1:
@@ -917,8 +822,6 @@ class TermDAG(object):
             # xdist - 1 ... except in the pure vertical case where 
             # xdist is already zero. Kind of strange isn't it?
             for y in range(y1, y2 - max(0, xdist - 1)):
-                if self.debug:
-                    print 'moving vertical with', x1, y
                 moves.append((x1, y, '|', True))
                 currenty = y
         else:
@@ -927,15 +830,11 @@ class TermDAG(object):
             # room to go the y direction (minus 1... we don't go all the way)
             for x in range(x1, x2 - xdir * (ydist), xdir):
             #for x in range(x1 + xdir, x2 - xdir * (ydist), xdir):
-                if self.debug:
-                    print 'moving horizontal with', x, (y1 - 1)
                 moves.append((x, y1 - 1, '_', True))
                 currentx = x
 
         for y in range(currenty + 1, y2):
             currentx += xdir
-            if self.debug:
-                print 'moving diag to', currentx, y
             if xdir == 1:
                 moves.append((currentx, y, '\\', True))
             else:
@@ -950,7 +849,7 @@ class TermDAG(object):
            @param with_colors: True if ANSI colors should be used. Otherwise
                                prints whatever terminal default is.
         """
-        if not self.layout and not self.debug:
+        if not self.layout:
             self.layout_hierarchical()
 
         row_begin = self.pad_corner_x
@@ -1238,25 +1137,6 @@ class TermDAG(object):
             self.qpad.addstr(0, 0, self.question)
 
         self.resize(stdscr)
-
-        if self.debug:
-            # Check colors
-            def color_string(self, tup):
-                string = '(' + str(tup[0])
-                for val in tup[1:]:
-                    string += ',' + str(val)
-                string += ')'
-                return string
-
-            stdscr.move(0, 0)
-            self.color_dict = dict()
-            for i in range(0, curses.COLORS):
-                fg, bg = curses.pair_content(i + 1)
-                self.color_dict[i + 1] = fg
-                if i % 8 == 0:
-                    stdscr.move(i / 8, 0)
-                stdscr.addstr(color_string(curses.color_content(fg)),
-                    curses.color_pair(i + 1))
 
         # Save state
         self.grid_colors = []
@@ -1682,10 +1562,6 @@ class TermDAG(object):
             segment1 = self.segment_ids[name1]
             segment2 = self.segment_ids[name2]
 
-            if self.debug:
-                print "\n     Popping", x1, y1, segment1, segment2
-                self.print_pqueue()
-
             if segment1.is_top_endpoint(x1, y1):
                 self.top_endpoint(segment1)
             elif segment1.is_bottom_endpoint(x1, y1):
@@ -1703,40 +1579,26 @@ class TermDAG(object):
         # Add end point to BST
         self.bst.insert(segment)
 
-        if self.debug:
-            print "     Adding", segment
-            self.bst.print_tree()
-
         # Check for crossings of BST neighbors of the segment
         # If it exists, remove it
-        before = self.bst.find_previous(segment, self.debug)
-        after = self.bst.find_next(segment, self.debug)
+        before = self.bst.find_previous(segment)
+        after = self.bst.find_next(segment)
         if before and after and (before.name, after.name) in self.crossings:
             x, y = self.crossings[(before.name, after.name)]
             self.pqueue.remove((y, x, before.name, after.name))
             heapq.heapify(self.pqueue)
-            if self.debug:
-                print " -- removing (", y, ",", x, ",", before, after,")"
 
         # Check for and catalog crossing of before neighbor
-        bcross, x, y = segment.intersect(before, self.debug)
+        bcross, x, y = segment.intersect(before)
         if bcross and (y, x, before.name, segment.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, before.name, segment.name))
             self.crossings[(before.name, segment.name)] = (x, y)
-            if self.debug:
-                print " -- pushing (", y, ",", x, ",", before, segment, ")"
 
         # Check for and catalog crossing of after neighbor
-        across, x, y = segment.intersect(after, self.debug)
+        across, x, y = segment.intersect(after)
         if across and (y, x, segment.name, after.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, segment.name, after.name))
             self.crossings[(segment.name, after.name)] = (x, y)
-            if self.debug:
-                print " -- pushing (", y, ",", x, ",", segment, after,")"
-
-        if self.debug and (before or after):
-            print "CHECK: ", bcross, across, segment, before, after
-            self.print_pqueue()
 
 
     def bottom_endpoint(self, segment):
@@ -1744,30 +1606,19 @@ class TermDAG(object):
 
            @param segment: current segment
         """
-        if self.debug:
-            print "     Bottom Check", segment
-            self.bst.print_tree()
-
         # Find BST neighbors
-        before = self.bst.find_previous(segment, self.debug)
-        after = self.bst.find_next(segment, self.debug)
+        before = self.bst.find_previous(segment)
+        after = self.bst.find_next(segment)
 
         # Remove segment from BST
-        self.bst.delete(segment, self.debug)
-
-        if self.debug:
-            print "     Deleting", segment
-            self.bst.print_tree()
+        self.bst.delete(segment)
 
         # Check for and catalog crossing of neighbors
         if before:
-            bacross, x, y = before.intersect(after, self.debug)
+            bacross, x, y = before.intersect(after)
             if bacross and y > segment.y1 and (y, x, before.name, after.name) not in self.pqueue:
                 heapq.heappush(self.pqueue, (y, x, before.name, after.name))
                 self.crossings[(before.name, after.name)] = (x, y)
-                if self.debug:
-                    print " -- adding (", y, ",", x, ",", before, after,")"
-                    self.print_pqueue()
 
 
     def crossing(self, c1, c2, segment1, segment2):
@@ -1778,27 +1629,19 @@ class TermDAG(object):
            @param segment1: first crossing segment
            @param segment2: second crossing segment
         """
-        if self.debug:
-            print "     Crossing check", c1, c2, segment1, segment2
-            self.bst.print_tree()
-
         # Find neighbors in the BST of the crossing pair
         first = segment1
         second = segment2
-        before = self.bst.find_previous(first, self.debug)
+        before = self.bst.find_previous(first)
         if before and before.name == segment2.name:
             first = segment2
             second = segment1
-            before = self.bst.find_previous(first, self.debug)
+            before = self.bst.find_previous(first)
 
-        after = self.bst.find_next(second, self.debug)
+        after = self.bst.find_next(second)
 
         # Now do the swap of the crossing segmenets
         self.bst.swap(first, second, c1, c2)
-
-        if self.debug:
-            print "     Swapping", first, second
-            self.bst.print_tree()
 
         # Remove crossings between first/before and second/after
         # from the priority queue
@@ -1807,33 +1650,22 @@ class TermDAG(object):
             if (y, x, second.name, after.name) in self.pqueue:
                 self.pqueue.remove((y, x, second.name, after.name))
                 heapq.heapify(self.pqueue)
-                if self.debug:
-                    print " -- removing (", y, ",", x, ",", second, after, ")"
         if before and first and (before.name, first.name) in self.crossings:
             x, y = self.crossings[(before.name, first.name)]
             if (y, x, before.name, first.name) in self.pqueue:
                 self.pqueue.remove((y, x, before.name, first.name))
                 heapq.heapify(self.pqueue)
-                if self.debug:
-                    print " -- pushing (", y, ",", x, ",", before, first, ")"
 
         # Add possible new crossings after the swap
         if before:
-            cross1, x, y = before.intersect(second, self.debug)
+            cross1, x, y = before.intersect(second)
             if cross1 and y > c2 and (y, x, before.name, second.name) not in self.pqueue:
                 heapq.heappush(self.pqueue, (y, x, before.name, second.name))
                 self.crossings[(before.name, second.name)] = (x, y)
-                if self.debug:
-                    print " -- pushing (", y, ",", x, ",", before, second,")"
-        cross2, x, y = first.intersect(after, self.debug)
+        cross2, x, y = first.intersect(after)
         if cross2 and y > c2 and (y, x, first.name, after.name) not in self.pqueue:
             heapq.heappush(self.pqueue, (y, x, first.name, after.name))
             self.crossings[(first.name, after.name)] = (x, y)
-            if self.debug:
-                print " -- pushing (", y, ",", x, ",", first, after, ")"
-
-        if self.debug:
-            self.print_pqueue()
 
 
 class TermBST(object):
@@ -1911,17 +1743,15 @@ class TermBST(object):
             return self.find_helper(root.right, segment)
 
 
-    def find_previous(self, segment, debug = False):
+    def find_previous(self, segment):
         """Find the previous node to the given segment.
 
            @param segment: segment whose previous node is to be found.
-           @param debug: True if debug information should be printed.
            @return predecessor node
         """
         node = segment.BSTNode
-        if node is None and debug:
-            print "ERROR, could not find", segment, " in find_previous"
-            return None
+        assert node is not None, \
+            "Attempting to find previous of segment without a BST node."
         predecessor = node.left
         last = predecessor
         while predecessor:
@@ -1942,17 +1772,15 @@ class TermBST(object):
             return predecessor
 
 
-    def find_next(self, segment, debug = False):
+    def find_next(self, segment):
         """Find the next node to the given segment in BST order.
 
            @param segment: segment whose next node is to be found.
-           @param debug: True if debug information should be printed.
            @return successor node
         """
         node = segment.BSTNode
-        if node is None and debug:
-            print "ERROR, could not find", segment, " in find_next"
-            return None
+        assert node is not None, \
+            "Attempting to find next of segment without a BST node."
         successor = node.right
         last = successor
         while successor:
@@ -1973,19 +1801,15 @@ class TermBST(object):
             return successor
 
 
-    def delete(self, segment, debug = False):
+    def delete(self, segment):
         """Delete a segment from the BST.
 
            @param segment: segment to be deleted
-           @param debug: True if debug information should be printed.
         """
         node = segment.BSTNode
         segment.BSTNode = None
-        if node is None:
-            if debug:
-                print "ERROR, could not find", segment, "in delete"
-                self.print_tree()
-            return
+        assert node is not None, \
+            "Attempting to delete segment from BST without a BST node."
 
         replacement = None
         if node.left is None and node.right is None:
@@ -2004,7 +1828,7 @@ class TermBST(object):
                 last = predecessor
                 predecessor = predecessor.right
             node.segment = last.segment
-            self.delete(last.segment, debug)
+            self.delete(last.segment)
             replacement = node
             replacement.segment.BSTNode = replacement
 
@@ -2015,59 +1839,10 @@ class TermBST(object):
         elif node.parent.right == node:
             node.parent.right = replacement
         else:
-            if debug:
-                print "ERROR, parenting error on", segment, "in delete"
-                self.print_tree()
             return
 
         if replacement:
             replacement.parent = node.parent
-
-
-    def print_tree(self):
-        """Print the BST."""
-        print '--- Tree ---'
-        if self.root:
-            self.print_tree_helper(self.root, '')
-        print '------------'
-
-
-    def print_tree_helper(self, root, indent):
-        """Print a BST subtree for debugging.
-
-           @param root: root of subtree to print
-           @param indent: current indent level
-        """
-        if root.left:
-            self.print_tree_helper(root.left, indent + '   ')
-        print indent, root.segment
-        if root.right:
-            self.print_tree_helper(root.right, indent + '   ')
-
-
-    def tree_to_list(self):
-        """Flattens BST to in-order list.
-
-           @return nodes in list format.
-        """
-        lst = []
-        lst = self.tree_to_list_helper(self.root, lst)
-        return lst
-
-
-    def tree_to_list_helper(self, root, lst):
-        """Helper in creating BST in-order list.
-
-           @param root: root of subtree to be flattened
-           @param lst: list to add flattened subtree to
-           @return partial flattened list
-        """
-        if root.left:
-            lst = self.tree_to_list_helper(root.left, lst)
-        lst.append(root.segment)
-        if root.right:
-            lst = self.tree_to_list_helper(root.right, lst)
-        return lst
 
 
 class TermBSTNode(object):
@@ -2159,14 +1934,13 @@ class TermSegment(object):
         return seg
 
 
-    def split(self, node, bundle = False, debug = False):
+    def split(self, node, bundle = False):
         """Split this segment into two at node. Return the next segment.
 
            Note the new segment is always the second part (closer to the sink).
 
            @param node: end point of two new segments
            @param bundle: True if this is part of a bundled edge
-           @param debug: True if debug information should be included
         """
 
         # The one we are splitting from may have been updated by a previous split
@@ -2176,29 +1950,21 @@ class TermSegment(object):
         # split from, one that contains the node
         splitter = self
         if bundle:
-            if debug:
-                print "Comparing: ", node._x, self.x1, self.x2
             if self.x1 < self.x2:
                 if node._x < self.x1 or node._x > self.x2:
                     for child in self.origin.children:
                         if node._x > child.x1 and node._x < child.x2:
                             splitter = child
-                            if debug:
-                                print "Splitting on child (x):", child
             else:
                 if node._x < self.x2 or node._x > self.x1:
                     for child in self.origin.children:
                         if node._x > child.x2 and node._x < child.x1:
                             splitter = child
-                            if debug:
-                                print "Splitting on child (x):", child
         else:
             if node._y > self.y1 or node._y < self.y2:
                 for child in self.origin.children:
                     if node._y < child.y1 and node._y > child.y2:
                         splitter = child
-                        if debug:
-                            print "Splitting on child (y):", child
 
         other = TermSegment(node._x, node._y, splitter.x2, splitter.y2)
         other.start = node
@@ -2245,11 +2011,10 @@ class TermSegment(object):
         return False
 
 
-    def intersect(self, other, debug = False):
+    def intersect(self, other):
         """Check for intersection with another segment.
 
            @param other: segment we may intersect with
-           @param debug: True if debug information should be print
            @return a tuple where the first value indicates whether
                    there was an intersection and the next two values
                    indicate the intersecting point if there was one.
@@ -2262,10 +2027,6 @@ class TermSegment(object):
         initcross = self.cross2D((other.x1 - self.x1, other.y1 - self.y1),
             self.pdiff)
 
-        if debug:
-            print " - Intersecting", self, other, self.pdiff, other.pdiff, \
-                diffcross, other.x1, self.x1, other.y1, self.y1, initcross
-
         if diffcross == 0 and initcross == 0: # Co-linear
             # Impossible for our purposes -- we do not count intersection at
             # end points
@@ -2277,14 +2038,10 @@ class TermSegment(object):
         else: # intersection!
             offset = initcross / diffcross
             offset2 = self.cross2D((other.x1 - self.x1, other.y1 - self.y1), other.pdiff) / diffcross
-            if debug:
-                print " - offsets are", offset, offset2
 
             if offset > 0 and offset < 1 and offset2 > 0 and offset2 < 1:
                 xi = other.x1 + offset * other.pdiff[0]
                 yi = other.y1 + offset * other.pdiff[1]
-                if debug:
-                    print " - points are:", xi, yi
                 return (True, xi, yi)
             return (False, 0, 0)
 
@@ -2446,22 +2203,17 @@ class TermNode(object):
         self._in_segments.append(segment)
 
 
-    def findCrossingHeights(self, min_x, max_x, debug = False):
+    def findCrossingHeights(self, min_x, max_x):
         """Determine where crossings between segments should take place for bundling.
 
            @param min_x: min_x in outer graph
            @param max_x: max_x in outer graph
-           @param debug: if True, print debug information
         """
-        if debug:
-            print 'Find extents', self.name, self._x, self._y
         for segment in self._in_segments:
             y = segment.y1
             if y not in self.crossing_counts:
                 self.crossing_counts[y] = 0
             self.crossing_counts[y] += segment.vertical_crossing_count
-            if debug:
-                print '   Segment:', segment.name, segment.x1, segment.y1, segment.vertical_crossing_count
 
         # We set different offsets for different x values based on the
         # min and max x -- we never go higher than half way up the y value
@@ -2471,9 +2223,7 @@ class TermNode(object):
         normalized = 1.0
         if max_x - min_x != 0:
             normalized = 0.5 * (self._x - min_x) / (max_x - min_x)
-        #print "crossings for", self.name, self._x, self._y
         for y, count in self.crossing_counts.items():
-            #print "   ", y, count
             if count > 0:
                 offset = (self._y - y) * normalized
                 self.crossing_heights[y] = self._y - offset
@@ -2552,7 +2302,6 @@ class TermLayout(object):
         self._running_neighbors = dict()
         self._links = list()
         self._link_dict = dict()
-        self._debug_names = dict() # Link debug names
 
         # ----------------------------------------------------
         # Structures to match C++ layout version:
@@ -2582,7 +2331,6 @@ class TermLayout(object):
             self._links.append(skeleton)
             self._original_links.append(skeleton)
             self._link_dict[link.id] = skeleton
-            self._debug_names[link.id] = link.source + "-->" + link.sink
             self._running_neighbors[link.source].add(link.sink)
             self._running_neighbors[link.sink].add(link.source)
 
@@ -2629,19 +2377,13 @@ class TermLayout(object):
 
         # TreePlace -- figure out LR tree extents, put placements in
         # relativePosition
-        if debug_layout:
-            print "PLACING TREE..."
         self.treePlace(source, relativePosition)
 
         # Calc Layout -- convert relativePosition into coords
-        if debug_layout:
-            print "Tree placed, calculating coords...."
         self.calcLayout(source, relativePosition, 0, 0, 0, rankSizes)
 
         # Ortho is true -- do edge bends
         # This may be unnecessary
-        if debug_layout:
-            print "Layout calc'd. Doing edge bends inside RTE..."
         for link in self._links:
             source = self._nodes[link.source]
             sink = self._nodes[link.sink]
@@ -2654,7 +2396,7 @@ class TermLayout(object):
                 link.coords = tmp
 
 
-    def calcLayout(self, node, relativePosition, x, y, rank, rankSizes, indent = "  "):
+    def calcLayout(self, node, relativePosition, x, y, rank, rankSizes):
         """Calculates the position of a node.
 
            @param node: a node object to be placed
@@ -2664,13 +2406,10 @@ class TermLayout(object):
            @param y: y offset so far
            @param rank: the depth of the current node
            @param rankSizes: dict of how many ranks per node... only sused for spacing, REMOVE ME
-           @param indent: for debugging
 
            Note: as all nodes are the same size, we don't have to worry about spacing.
         """
         node.coord = (x + relativePosition[node], -1 * self.spacing * rank)
-        if debug_layout:
-            print indent, node.name, 'with position', x, relativePosition[node], node.coord
         for linkid in node._out_links:
             link = self._link_dict[linkid]
             out = self._nodes[link.sink]
@@ -2681,95 +2420,62 @@ class TermLayout(object):
             decalLevel = rank + lenCounter
 
             self.calcLayout(out, relativePosition, x + relativePosition[node],
-                decalY, decalLevel, rankSizes, indent + "  ")
+                decalY, decalLevel, rankSizes)
 
 
-    def treePlace(self, node, relativePosition, indent = " " ):
+    def treePlace(self, node, relativePosition):
         """Calculate the positions of the subtrees.
 
            @param node: root node of subtree to be placed
            @param relativePosition: dict keeping track of the relative positions of the nodes
-           @param indent: for debugging.
         """
         if len(node._out_links) == 0:
-            if debug_layout:
-                print indent, node.name, 'place with zero outlinks (-0.5, 0.5, 1)'
             relativePosition[node] = 0
             return [(-0.5, 0.5, 1)] # Triple L, R, size
 
-        if debug_layout:
-            print indent, node.name, 'placing left tree'
         childPos = []
-        leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink], relativePosition,
-            indent + "  " )
-        if debug_layout:
-            print indent, node.name, "left tree is:", leftTree
+        leftTree = self.treePlace(self._nodes[self._link_dict[node._out_links[0]].sink],
+            relativePosition)
         childPos.append((leftTree[0][0] + leftTree[0][1]) / 2.0)
 
         # useLength
         if self._link_dict[node._out_links[0]]._edgeLength > 1:
             leftTree.insert(0, (leftTree[0][0], leftTree[0][1],
                 self._link_dict[node._out_links[0]]._edgeLength - 1)) # length is probably always 1
-            if debug_layout:
-                print indent, node.name, "pushing for use length", self._debug_names[node._out_links[0]]
 
-        if debug_layout:
-            print indent, node.name, 'looping through out links', [ self._debug_names[x] for x in node._out_links ]
         for linkid in node._out_links[1:]:
             link = self._link_dict[linkid]
 
-            if debug_layout:
-                print indent, node.name, 'placing right tree based on', self._debug_names[linkid]
-            rightTree = self.treePlace(self._nodes[link.sink], relativePosition, indent + "  ")
-            if debug_layout:
-                print indent, node.name, "found right tree is:", rightTree, "and left tree is", leftTree
-
+            rightTree = self.treePlace(self._nodes[link.sink], relativePosition)
 
             if link._edgeLength > 1:
                 rightTree.insert(0, (rightTree[0][0], rightTree[0][1],
                     link._edgeLength - 1))
-                if debug_layout:
-                    print indent, node.name, "use length right tree is:", rightTree
-
 
             decal = self.calcDecal(leftTree, rightTree)
-            if debug_layout:
-                print indent, node.name, 'calculating decal of', decal
             tempLeft = (rightTree[0][0] + rightTree[0][1]) / 2.0
 
-            if debug_layout:
-                print indent, node.name, 'Checking mergeLR for link', self._debug_names[linkid]
-            merged = self.mergeLR(leftTree, rightTree, decal, indent + "  ")
-            if debug_layout:
-                print indent, node.name, "post-mergeLR", foo, leftTree
+            merged = self.mergeLR(leftTree, rightTree, decal)
             if merged == leftTree:
-                if debug_layout:
-                    print indent, node.name, 'appending equal'
                 childPos.append(tempLeft + decal)
                 rightTree = []
             else:
-                if debug_layout:
-                    print indent, node.name, 'subtracting decal equal'
                 for i, pos in enumerate(chlidPos):
                     childPos[i] = pos - decal
                 childPos.append(tempLeft)
                 leftTree = rightTree
 
 
-        if debug_layout:
-            print indent, node.name, 'looping through out links a second time'
         posFather = (leftTree[0][0] + leftTree[0][1]) / 2.0
         leftTree.insert(0, (posFather - 0.5, posFather + 0.5, 1))
         for i, linkid in enumerate(node._out_links):
             link = self._link_dict[linkid]
             relativePosition[self._nodes[link.sink]] = childPos[i] - posFather
-            if debug_layout:
-                print indent, node.name, 'setting', self._nodes[link.sink].name, childPos[i], posFather, (childPos[i] - posFather)
         relativePosition[node] = 0
         return leftTree
 
 
-    def mergeLR(self, left, right, decal, indent = " "):
+    def mergeLR(self, left, right, decal):
         # Left and Right lists are tuples (left, right, size)
         # We use these variables for the indexing
         L = 0
@@ -2781,13 +2487,7 @@ class TermLayout(object):
         itL = 0
         itR = 0
 
-        if debug_layout:
-            print indent, 'Beginning mergeLR loop of left', left, 'and right', right
         while itL < len(left) and itR < len(right):
-            if debug_layout:
-                print indent, 'Beginning itL', list(left[itL]), 'itR', list(right[itR])
-                print indent, ' left:', left
-                print indent, ' right:', right
             minSize = min(left[itL][size] - iL, right[itR][size] - iR)
             tmp = (left[itL][L], right[itR][R] + decal, minSize)
 
@@ -2832,11 +2532,6 @@ class TermLayout(object):
             if iR >= right[itR][size]:
                 itR += 1
                 iR = 0
-
-            if debug_layout:
-                print indent, 'Ending iL', iL, 'iR', iR
-                print indent, ' left:', left
-                print indent, ' right:', right
 
         if itL < len(left) and iL != 0:
             tmp = (left[itL][L], left[itL][R], left[itL][size] - iL)
@@ -2918,53 +2613,28 @@ class TermLayout(object):
         for name in self._nodes_list:
             node = self._nodes[name]
             self.grid[node.rank].append(node)
-            if debug_layout:
-                print "Adding to grid", name, "to row", node.rank, \
-                    "embedding", (len(self.grid[node.rank]) - 1)
 
         # Ensure each link spans exactly one rank
         if not self.single_source_tree:
-            if debug_layout:
-                print "Make proper..."
             self.makeProper(source_node)
 
         embedding = dict()
 
 
         # Reorder in rank
-        if debug_layout:
-            print "Checking single source tree..."
         if not self.single_source_tree:
-            if debug_layout:
-                print "Reducing crossings..."
             self.reduceCrossings(source_node, embedding)
 
-            if debug_layout:
-                print "Crossings reduced, creating spanning tree..."
             self.createSpanningTree(embedding)
 
-        if debug_layout:
-            print "Preparing to apply tree algorithm..."
         # Apply Tree algorithm
         rankSizes = []
         for row in self.grid:
             rankSizes.append(len(row))
-        if debug_layout:
-            print "RTE time... "
         self.RTE(source_node, rankSizes) #self.grid)
-        if debug_layout:
-            print "RTE clear."
 
         # Do Edge Bends
-        if debug_layout:
-            print "Computing edge bends..."
         self.computeEdgeBends()
-        if debug_layout:
-            print "Bends computed..."
-
-        if debug_layout:
-            self.printNodeCoords()
-            self.printEdgeCoords()
 
         self.valid = True
 
@@ -2978,14 +2648,9 @@ class TermLayout(object):
 
         # We only keep one in-link: the one that falls in the middle of 
         # our sort of them by the embedding of their sources.
-        if debug_layout:
-            print "SPANNING TREE"
         for name in self._nodes_list:
             node = self._nodes[name]
             if len(node._in_links) > 1:
-                if debug_layout:
-                    print "   Pre-sort", [self._debug_names[x] for x in node._in_links]
-
                 # Sort by source node
                 node._in_links.sort(key = lambda x : embedding[self._link_dict[x].source])
 
@@ -2993,9 +2658,6 @@ class TermLayout(object):
                 half = int(math.floor(len(node._in_links) / 2))
 
                 # Keep only the halfway point
-                if debug_layout:
-                    print "   Keeping", self._debug_names[node._in_links[half]], half, \
-                        "of", [self._debug_names[x] for x in node._in_links], len(node._in_links)
                 node._in_links = [ node._in_links[half] ]
 
 
@@ -3060,31 +2722,28 @@ class TermLayout(object):
                 link.segments.append(self.beforeCoord(self._nodes[link.sink].coord))
 
 
-    def initCross(self, name, visited, embedding, dfsid, indent = " "):
+    def initCross(self, name, visited, embedding, dfsid):
         """Set the initial embedding order. This implements a DFS.
 
            @param name: name of node to have its embedding set
            @param visited: dictionary of already visited nodes
            @param embedding: dictionary holding node embedding values
            @param dfsid: depth first search depth
-           @param indent: optional indent string for debugging
         """
         if (visited[name]):
             return
 
         visited[name] = True
         embedding[name] = dfsid
-        if debug_layout:
-            print indent, "initCross setting", name, "to", dfsid
         node = self._nodes[name]
         for linkid in node._out_links:
             if linkid not in self._modified_links:
                 sink = self._link_dict[linkid].sink
-                self.initCross(sink, visited, embedding, dfsid + 1, indent + "  ")
+                self.initCross(sink, visited, embedding, dfsid + 1)
         for linkid in node._out_links:
             if linkid in self._modified_links:
                 sink = self._link_dict[linkid].sink
-                self.initCross(sink, visited, embedding, dfsid + 1, indent + "  ")
+                self.initCross(sink, visited, embedding, dfsid + 1)
 
 
     def reduceCrossings(self, source, embedding):
@@ -3116,13 +2775,12 @@ class TermLayout(object):
                 sink.add_in_link(linkName)
                 tmpSinkLinks.append(sinkLink)
                 self._link_dict[linkName] = sinkLink
-                self._debug_names[linkName] = linkName
                 self._running_neighbors[self.sink_name].add(node.name)
                 self._running_neighbors[node.name].add(self.sink_name)
 
         # Add sink to self._nodes after so we don't create a sink link to
         # itself
-        self._nodes[self.sink_name] = sink # Caution!! This will not work if there is a node named sink, please fix
+        self._nodes[self.sink_name] = sink
         self._nodes_list.append(self.sink_name)
 
         # Setup grid
@@ -3141,14 +2799,8 @@ class TermLayout(object):
 
         # Set the embedding of each row based on the initial crossing order
         for a, row in enumerate(self.grid):
-            if debug_layout:
-                print "Setting node row", a
             row = sorted(row, key = lambda x : embedding[x.name])
-            if debug_layout:
-                print [(node.name, embedding[node.name]) for node in row]
             for i, node in enumerate(row):
-                if debug_layout:
-                    print "Setting node", node.name, "embedding to", i, "and degree is", degrees[node.name]
                 embedding[node.name] = i
             self.grid[a] = row
 
@@ -3157,27 +2809,17 @@ class TermLayout(object):
         for q in range(self.num_sweeps):
             # Up Sweep
             for i in range(maxRank, -1, -1):
-                if debug_layout:
-                    print "  Two-layer on", i, "true "
                 self.reduceTwoLayerCrossings(embedding, i, True, degrees)
 
             # Down Sweep
             for i in range(maxRank + 1):
-                if debug_layout:
-                    print "  Two-layer on", i, "false "
                 self.reduceTwoLayerCrossings(embedding, i, False, degrees)
 
 
         # Set final embedding based on leftover order
-        if debug_layout:
-            print "Past two layer crossings"
         for a, row in enumerate(self.grid):
-            if debug_layout:
-                print "Working on row", a
             sorted_row = sorted(row, key = lambda x : embedding[x.name])
             for i, node in enumerate(sorted_row):
-                if debug_layout:
-                    print "Setting node", node.name, "embedding to", i
                 embedding[node.name] = i
 
         # Remove the added sink
@@ -3217,10 +2859,6 @@ class TermLayout(object):
                 mySum += embedding[self.sink_name]
 
             embedding[node.name] = mySum / float(degree + 1.0)
-
-            if debug_layout:
-                print "Setting node %s embedding to %.5f from sum %.5f and deg %s" % \
-                    (node.name, (mySum / float(degree + 1.0)), mySum, degree)
 
 
     def createFakeDegrees(self):
@@ -3314,14 +2952,11 @@ class TermLayout(object):
                 newNode.add_in_link(link.id)
                 newLinkName = str(link.id) + '-1' #+ str(atRank)
                 newLink = TermLink(newLinkName, newName, end.name)
-                self._debug_names[newLinkName] = self._debug_names[link.id] + '-1'
                 newNode.add_out_link(newLink.id)
                 link.children.append(newLink)
                 toAppend.append(newLink)
                 self._link_dict[newLinkName] = newLink
                 self.grid[atRank].append(newNode)
-                if debug_layout:
-                    print " CREATING", self._debug_names[newLinkName], "at", atRank
 
                 if delta > 2:
                     atRank = endRank - 1
@@ -3342,15 +2977,12 @@ class TermLayout(object):
                     secondNode.add_in_link(newLink.id)
                     secondLinkName = str(link.id) + '-2'# + str(atRank)
                     secondLink = TermLink(secondLinkName, secondName, end.name)
-                    self._debug_names[secondLinkName] = self._debug_names[link.id] + '-2'
                     secondNode.add_out_link(secondLink.id)
                     link.children.append(secondLink)
                     toAppend.append(secondLink)
                     self._link_dict[secondLinkName] = secondLink
                     end.add_in_link(secondLink.id)
                     self.grid[startRank + 2].append(secondNode)
-                    if debug_layout:
-                        print " CREATING", self._debug_names[secondLinkName], "at", atRank
                 else:
                     end.add_in_link(newLink.id)
                     self._running_neighbors[end.name].add(newName)
@@ -3413,7 +3045,6 @@ class TermLayout(object):
             node.add_in_link(linkName)
             self._links.append(link)
             self._link_dict[linkName] = link
-            self._debug_names[linkName] = linkName
             self._running_neighbors[source_name].add(node.name)
             self._running_neighbors[node.name].add(source_name)
         return source

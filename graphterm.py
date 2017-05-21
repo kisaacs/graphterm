@@ -1,3 +1,20 @@
+# This file implements graphterm, an interactive, ASCII representation for
+# directed acyclic graphs.
+#
+# To Use:
+#   1. Create a TermDAG object and populate with node and link information
+#      using the add_node(name) and add_link(source_name, sink_name) methods.
+#   2. Call interactive() for an interactive curses screen with the DAG,
+#      or Call printonly() to print the layout to screen with the top node
+#      highlighted.
+#
+# * The interactivity is managed through the curses library.
+# * The ASCII layout modifies a graphical layout (TermLayout) translated from 
+#   the Tulip graph drawing library: http://tulip.labri.fr/
+#
+# File: Kate Isaacs
+# License: LGPL v.3
+
 import heapq
 from heapq import *
 import curses
@@ -221,7 +238,7 @@ class TermDAG(object):
         """Layout the graph and show interactively via curses."""
         self.layout_hierarchical()
         if self.is_interactive:
-            curses.wrapper(interactive_helper, self)
+            curses.wrapper(termdag_interactive_helper, self)
 
         # Persist the depiction with stdout:
         self.print_grid(True)
@@ -2509,7 +2526,13 @@ class TermLink(object):
 class TermLayout(object):
     """Class for calculating graph layout. This implements the
        Hierarchical Layout of D. Auber from the Tulip graph drawing
-       framework."""
+       framework version 4.9.0. It has elements of the HierachicalLayout and
+       TreeReingoldAndTilfordExtended layouts. Note this does not perfectly
+       copy those layouts, only the portions needed for DAG layouts. It does
+       NOT handle edge reversal or self-loops, for example.
+
+       See http://tulip.labri.fr/
+    """
 
     def __init__(self, graph, sweeps = 4):
         """Constructor for TermLayout.
@@ -2748,6 +2771,7 @@ class TermLayout(object):
 
     def mergeLR(self, left, right, decal, indent = " "):
         # Left and Right lists are tuples (left, right, size)
+        # We use these variables for the indexing
         L = 0
         R = 1
         size = 2
@@ -3447,7 +3471,7 @@ class TermLayout(object):
 
 
 
-def interactive_helper(stdscr, graph):
+def termdag_interactive_helper(stdscr, graph):
     """Function for curses wrapper.
 
        @param stdscr: curses window

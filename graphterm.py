@@ -1496,7 +1496,7 @@ class TermDAG(object):
         self.grid_colors[node._row][self.left_offset + node._col] = color
         label_offset = 0
         if node.use_offset:
-            label_offset = self.row_last[node._row] + 2
+            label_offset = self.left_offset + self.row_last_mark[node._row] + 2
         for i, ch in enumerate(node.name):
             self.grid_colors[node._row][label_offset + node.label_pos + i] = color
 

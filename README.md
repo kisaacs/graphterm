@@ -6,7 +6,7 @@ graphs in ASCII.
 Usage
 -----
 Create a TermDAG object and populate it with nodes and links. Call
-`interactve` to draw in interactive form and `printonly` to output the ASCII
+`interactve()` to draw in interactive form and `printonly()` to output the ASCII
 representation to `stdout`:
 
 ```

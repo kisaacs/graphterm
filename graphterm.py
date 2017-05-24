@@ -1698,8 +1698,8 @@ class TermBST(object):
            @param b1: crossing order value 1
            @param b2: crossing order value 2
         """
-        node1 = segment1.BSTNode
-        node2 = segment2.BSTNode
+        node1 = segment2.BSTNode
+        node2 = segment1.BSTNode
         node1.segment = segment2
         node2.segment = segment1
         segment1.b1 = b1
@@ -1796,8 +1796,6 @@ class TermBST(object):
         """
         node = segment.BSTNode
         segment.BSTNode = None
-        if node is None:
-            return
         assert node is not None, \
             "Attempting to delete segment from BST without a BST node."
 

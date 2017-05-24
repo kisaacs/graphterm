@@ -242,11 +242,17 @@ class TermDAG(object):
         for row in range(self.gridsize[0]):
             self.grid_colors.append([self.default_color for x
                 in range(self.gridsize[1])])
-        selected = self.node_order[0].name
-        self.select_node(None, selected, self.offset)
 
-        for i in range(self.gridsize[0]):
-            print self.print_color_row(i, 0, self.gridsize[1] + 1)
+        import sys
+        if sys.stdout.isatty():
+            selected = self.node_order[0].name
+            self.select_node(None, selected, self.offset)
+
+            for i in range(self.gridsize[0]):
+                print self.print_color_row(i, 0, self.gridsize[1] + 1)
+        else:
+            for row in self.grid:
+                print ''.join(row)
 
 
     def report(self):
@@ -1790,6 +1796,8 @@ class TermBST(object):
         """
         node = segment.BSTNode
         segment.BSTNode = None
+        if node is None:
+            return
         assert node is not None, \
             "Attempting to delete segment from BST without a BST node."
 

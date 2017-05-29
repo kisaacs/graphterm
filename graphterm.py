@@ -1573,8 +1573,9 @@ class TermDAG(object):
         after = self.bst.find_next(segment)
         if before and after and (before.name, after.name) in self.crossings:
             x, y = self.crossings[(before.name, after.name)]
-            self.pqueue.remove((y, x, before.name, after.name))
-            heapq.heapify(self.pqueue)
+            if (y, x, before.name, after.name) in self.pqueue:
+                self.pqueue.remove((y, x, before.name, after.name))
+                heapq.heapify(self.pqueue)
 
         # Check for and catalog crossing of before neighbor
         bcross, x, y = segment.intersect(before)
